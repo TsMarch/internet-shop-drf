@@ -12,3 +12,8 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = "__all__"
+
+
+class PriceValidator:
+    def validate(self, product):
+        return product.old_price - product.old_price * product.discount / 100

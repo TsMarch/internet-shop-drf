@@ -19,7 +19,7 @@ class Product(models.Model):
     description = models.CharField("Описание", max_length=300, blank=True)
     old_price = models.DecimalField("Цена без скидки", decimal_places=2, max_digits=10)
     discount = models.PositiveIntegerField("Процент скидки")
-    price = models.DecimalField("Цена со скидкой", decimal_places=2, max_digits=10)
+    price = models.DecimalField("Цена со скидкой", decimal_places=2, max_digits=10, blank=True)
     available = models.BooleanField("Доступность товара", default=True)
     available_quantity = models.PositiveIntegerField("Остаток товара на складе", default=0)
 
@@ -29,23 +29,27 @@ class Product(models.Model):
     def __str__(self):
         return f"Название товара: {self.name}; Цена со скидкой: {self.price}; Скидка: {self.discount}%"
 
-    @property
-    def price(self):
-        return self.old_price - self.old_price * self.discount / 100
+    def save(self, *args, **kwargs):
+        self.price = self.old_price - self.old_price * self.discount / 100
+        super().save(*args, **kwargs)
 
-    def clean(self):
+    def clean(self, *args, **kwargs):
         if not self.available and self.available_quantity > 0:
             raise ValidationError("Невозможно наличие товара на складе если он недоступен")
         super().save()
 
 
 class Cart(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField(default=0)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
 
     class Meta:
         verbose_name_plural = "Корзина"
 
     def __str__(self):
-        return f"{self.product.name}"
+        return f"Корзина {self.user}"
+
+
+class CartItems(models.Model):
+    cart = models.ForeignKey(Cart, related_name="items", on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1)
