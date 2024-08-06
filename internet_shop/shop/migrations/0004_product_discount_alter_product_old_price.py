@@ -13,16 +13,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="product",
             name="discount",
-            field=models.PositiveIntegerField(
-                default=100, verbose_name="Процент скидки"
-            ),
+            field=models.PositiveIntegerField(default=100, verbose_name="Процент скидки"),
             preserve_default=False,
         ),
         migrations.AlterField(
             model_name="product",
             name="old_price",
-            field=models.DecimalField(
-                decimal_places=2, max_digits=10, verbose_name="Цена без скидки"
-            ),
+            field=models.DecimalField(decimal_places=2, max_digits=10, verbose_name="Цена без скидки"),
         ),
     ]

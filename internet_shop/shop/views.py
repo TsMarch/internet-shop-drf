@@ -18,5 +18,3 @@ class ProductViewSet(ViewSet):
             return Response(serializer.data)
         except Product.DoesNotExist:
             return Response(status=404)
-
-

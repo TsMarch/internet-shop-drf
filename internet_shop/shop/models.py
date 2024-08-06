@@ -21,9 +21,7 @@ class Product(models.Model):
     discount = models.PositiveIntegerField("Процент скидки")
     price = models.DecimalField("Цена со скидкой", decimal_places=2, max_digits=10)
     available = models.BooleanField("Доступность товара", default=True)
-    available_quantity = models.PositiveIntegerField(
-        "Остаток товара на складе", default=0
-    )
+    available_quantity = models.PositiveIntegerField("Остаток товара на складе", default=0)
 
     class Meta:
         verbose_name_plural = "Товары"
@@ -37,9 +35,7 @@ class Product(models.Model):
 
     def clean(self):
         if not self.available and self.available_quantity > 0:
-            raise ValidationError(
-                "Невозможно наличие товара на складе если он недоступен"
-            )
+            raise ValidationError("Невозможно наличие товара на складе если он недоступен")
         super().save()
 
 

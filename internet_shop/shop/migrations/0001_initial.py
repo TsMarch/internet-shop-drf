@@ -44,21 +44,15 @@ class Migration(migrations.Migration):
                 ("name", models.CharField(max_length=100, verbose_name="Имя")),
                 (
                     "description",
-                    models.CharField(
-                        blank=True, max_length=300, verbose_name="Описание"
-                    ),
+                    models.CharField(blank=True, max_length=300, verbose_name="Описание"),
                 ),
                 (
                     "price",
-                    models.DecimalField(
-                        decimal_places=2, max_digits=6, verbose_name="Цена"
-                    ),
+                    models.DecimalField(decimal_places=2, max_digits=6, verbose_name="Цена"),
                 ),
                 (
                     "available",
-                    models.BooleanField(
-                        default=True, verbose_name="Доступность товара"
-                    ),
+                    models.BooleanField(default=True, verbose_name="Доступность товара"),
                 ),
                 (
                     "available_quantity",
