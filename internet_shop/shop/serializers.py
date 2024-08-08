@@ -14,6 +14,10 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class PriceValidator:
-    def validate(self, product):
-        return product.old_price - product.old_price * product.discount / 100
+class ProductSerializerMixin:
+    def get_serializer_class(self):
+        match self.action:
+            case 'retrieve':
+                return ProductSerializer
+            case _:
+                return ProductListSerializer
