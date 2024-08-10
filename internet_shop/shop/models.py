@@ -19,7 +19,9 @@ class Product(models.Model):
     description = models.CharField("Описание", max_length=300, blank=True)
     old_price = models.DecimalField("Цена без скидки", decimal_places=2, max_digits=10)
     discount = models.PositiveIntegerField("Процент скидки")
-    price = models.DecimalField("Цена со скидкой", decimal_places=2, max_digits=10, blank=True)
+    price = models.DecimalField(
+        "Цена со скидкой", decimal_places=2, max_digits=10, null=True, blank=True, editable=False
+    )
     available = models.BooleanField("Доступность товара", default=True)
     available_quantity = models.PositiveIntegerField("Остаток товара на складе", default=0)
 
@@ -28,10 +30,6 @@ class Product(models.Model):
 
     def __str__(self):
         return f"Название товара: {self.name}; Цена со скидкой: {self.price}; Скидка: {self.discount}%"
-
-    def save(self, *args, **kwargs):
-        self.price = self.old_price - self.old_price * self.discount / 100
-        super().save(*args, **kwargs)
 
     def clean(self, *args, **kwargs):
         if not self.available and self.available_quantity > 0:
