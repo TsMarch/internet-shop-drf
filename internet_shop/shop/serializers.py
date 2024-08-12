@@ -39,19 +39,18 @@ class ProductSerializerMixin:
                 return ProductListSerializer
 
 
+class ProductInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        exclude = ["description", "available", "category", "old_price", "discount"]
+
+
 class CartItemSerializer(serializers.ModelSerializer):
+    product = ProductInfoSerializer()
+
     class Meta:
         model = CartItems
         fields = ["product", "quantity", "added_at"]
-        depth = 1
-
-    def validate_quantity(self, cart):
-        quantity = cart.get('quantity')
-        match quantity <= 0:
-            case True:
-                raise serializers.ValidationError("Quantity must be greater than 0.")
-            case _:
-                return quantity
 
 
 class CartSerializer(serializers.ModelSerializer):
@@ -59,8 +58,20 @@ class CartSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Cart
-        fields = ['id', 'items']
+        fields = ["id", "user", "items"]
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("items")
+        cart = Cart.objects.create(**validated_data)
+        for item_data in items_data:
+            CartItems.objects.create(cart=cart, **item_data)
+        return cart
 
 
 class CartSerializerMixin:
-    pass
+    def get_serializer_class(self):
+        match self.action:
+            case "create":
+                return CartSerializer
+            case _:
+                return CartSerializer
