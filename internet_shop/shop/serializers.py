@@ -1,20 +1,37 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import serializers
-from rest_framework.relations import PrimaryKeyRelatedField
+from rest_framework.response import Response
 
 from .models import Product, Cart, CartItems
 
 
-class ProductListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Product
-        fields = ["id", "name", "price", "old_price"]
+class DynamicFieldsModelSerializer(serializers.ModelSerializer):
+
+    def __init__(self, *args, **kwargs):
+        print(kwargs)
+        fields = kwargs.pop("fields", None)
+        super().__init__(*args, **kwargs)
+        ##
+        if fields is not None:
+            allowed = set(fields)
+            existing = set(self.fields)
+            for field_name in existing - allowed:
+                self.fields.pop(field_name)
 
 
-class ProductSerializer(serializers.ModelSerializer):
+class ProductSerializer(DynamicFieldsModelSerializer):
     class Meta:
         model = Product
         fields = "__all__"
 
+
+class ProductLimitedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        exclude = ["description", "available", "category", "old_price", "discount"]
+
+
+class ProductCreateSerializer(ProductSerializer):
     def create(self, validated_data):
         old_price = validated_data.get("old_price")
         discount = validated_data.get("discount")
@@ -32,21 +49,26 @@ class ProductSerializerMixin:
             case "retrieve":
                 return ProductSerializer
             case "list":
-                return ProductListSerializer
-            case "create":
                 return ProductSerializer
+            case "create":
+                return ProductCreateSerializer
             case _:
-                return ProductListSerializer
+                return ProductSerializer
 
+    def list(self, request, *args, **kwargs):
+        queryset = Product.objects.all()
+        serializer = ProductSerializer(queryset, many=True, fields=["id", "name", "price"])
+        return Response(serializer.data)
 
-class ProductInfoSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Product
-        exclude = ["description", "available", "category", "old_price", "discount"]
+    def retrieve(self, request, pk=None, *args, **kwargs):
+        queryset = Product.objects.all()
+        product = get_object_or_404(queryset, pk=pk)
+        serializer = ProductSerializer(product)
+        return Response(serializer.data)
 
 
 class CartItemSerializer(serializers.ModelSerializer):
-    product = ProductInfoSerializer()
+    product = ProductLimitedSerializer()
 
     class Meta:
         model = CartItems

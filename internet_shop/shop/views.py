@@ -2,10 +2,10 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework import status, generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet, ViewSet
+from rest_framework.viewsets import ModelViewSet
 from .serializers import (
+    ProductCreateSerializer,
     ProductSerializer,
-    ProductListSerializer,
     ProductSerializerMixin,
     CartSerializer,
     CartItemSerializer,
@@ -14,10 +14,9 @@ from .serializers import (
 from .models import Product, Cart, CartItems
 
 
-class ProductViewSet(ModelViewSet):
+class ProductViewSet(ProductSerializerMixin, ModelViewSet):
     queryset = Product.objects.all()
-    serializer_class = ProductListSerializer
-    serializer_action_classes = {"list": ProductListSerializer, "retrieve": ProductSerializer}
+    serializer_class = ProductCreateSerializer
 
 
 class CartViewSet(CartSerializerMixin, ModelViewSet):
