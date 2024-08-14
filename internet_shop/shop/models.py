@@ -15,6 +15,7 @@ class ProductCategory(models.Model):
 
 class Product(models.Model):
     category = models.ForeignKey(ProductCategory, on_delete=models.PROTECT)
+    id = models.AutoField(primary_key=True)
     name = models.CharField("Имя", max_length=100, blank=False)
     description = models.CharField("Описание", max_length=300, blank=True)
     old_price = models.DecimalField("Цена без скидки", decimal_places=2, max_digits=10)

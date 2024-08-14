@@ -1,17 +1,15 @@
 from django.shortcuts import get_object_or_404
-from rest_framework import serializers
+from rest_framework import serializers, status
 from rest_framework.response import Response
 
 from .models import Product, Cart, CartItems
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
-
     def __init__(self, *args, **kwargs):
-        print(kwargs)
         fields = kwargs.pop("fields", None)
         super().__init__(*args, **kwargs)
-        ##
+
         if fields is not None:
             allowed = set(fields)
             existing = set(self.fields)
@@ -24,14 +22,6 @@ class ProductSerializer(DynamicFieldsModelSerializer):
         model = Product
         fields = "__all__"
 
-
-class ProductLimitedSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Product
-        exclude = ["description", "available", "category", "old_price", "discount"]
-
-
-class ProductCreateSerializer(ProductSerializer):
     def create(self, validated_data):
         old_price = validated_data.get("old_price")
         discount = validated_data.get("discount")
@@ -44,17 +34,6 @@ class ProductCreateSerializer(ProductSerializer):
 
 
 class ProductSerializerMixin:
-    def get_serializer_class(self):
-        match self.action:
-            case "retrieve":
-                return ProductSerializer
-            case "list":
-                return ProductSerializer
-            case "create":
-                return ProductCreateSerializer
-            case _:
-                return ProductSerializer
-
     def list(self, request, *args, **kwargs):
         queryset = Product.objects.all()
         serializer = ProductSerializer(queryset, many=True, fields=["id", "name", "price"])
@@ -68,11 +47,14 @@ class ProductSerializerMixin:
 
 
 class CartItemSerializer(serializers.ModelSerializer):
-    product = ProductLimitedSerializer()
+    product_name = serializers.CharField(source="product.name", required=False)
+    product_id = serializers.IntegerField(source="product.id")
+    product_price = serializers.IntegerField(source="product.price", required=False)
+    product_available_quantity = serializers.IntegerField(source="product.available_quantity", required=False)
 
     class Meta:
         model = CartItems
-        fields = ["product", "quantity", "added_at"]
+        fields = ["product_name", "product_id", "product_price", "product_available_quantity", "quantity", "added_at"]
 
 
 class CartSerializer(serializers.ModelSerializer):
@@ -83,17 +65,22 @@ class CartSerializer(serializers.ModelSerializer):
         fields = ["id", "user", "items"]
 
     def create(self, validated_data):
+        print(validated_data)
         items_data = validated_data.pop("items")
         cart = Cart.objects.create(**validated_data)
         for item_data in items_data:
-            CartItems.objects.create(cart=cart, **item_data)
+            product_id = item_data.pop("product")["id"]
+            product = Product.objects.get(id=product_id)
+            CartItems.objects.create(cart=cart, product=product, **item_data)
         return cart
 
 
 class CartSerializerMixin:
-    def get_serializer_class(self):
-        match self.action:
-            case "create":
-                return CartSerializer
-            case _:
-                return CartSerializer
+    def destroy(self, request, cart_id, item_id):
+        try:
+            cart_item = CartItems.objects.get(cart_id=cart_id, product_id=item_id)
+            print(cart_item)
+            cart_item.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except CartItems.DoesNotExist:
+            return Response({"error": "Cart item not found"}, status=status.HTTP_404_NOT_FOUND)
