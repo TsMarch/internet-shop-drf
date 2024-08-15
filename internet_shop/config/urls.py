@@ -28,6 +28,6 @@ cart_router.register(r"", CartViewSet, basename='cart')
 urlpatterns = [path("admin/", admin.site.urls),
                path("shop/", include(shop_router.urls)),
                path('cart/', include(cart_router.urls)),
-               path('cart/<int:cart_id>/remove/<int:product_id>/', CartViewSet.as_view({'delete': 'remove'}), name='cart-remove-item'),
+               #path('cart/<int:cart_id>/remove/<int:product_id>/', CartViewSet.as_view({'delete': 'remove'}), name='cart-remove-item'),
                ]
 

@@ -17,6 +17,12 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
                 self.fields.pop(field_name)
 
 
+class ProductListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = ["id", "name", "price", "old_price"]
+
+
 class ProductSerializer(DynamicFieldsModelSerializer):
     class Meta:
         model = Product
@@ -32,18 +38,6 @@ class ProductSerializer(DynamicFieldsModelSerializer):
                 validated_data["price"] = None
         return super().create(validated_data)
 
-
-class ProductSerializerMixin:
-    def list(self, request, *args, **kwargs):
-        queryset = Product.objects.all()
-        serializer = ProductSerializer(queryset, many=True, fields=["id", "name", "price"])
-        return Response(serializer.data)
-
-    def retrieve(self, request, pk=None, *args, **kwargs):
-        queryset = Product.objects.all()
-        product = get_object_or_404(queryset, pk=pk)
-        serializer = ProductSerializer(product)
-        return Response(serializer.data)
 
 
 class CartItemSerializer(serializers.ModelSerializer):
