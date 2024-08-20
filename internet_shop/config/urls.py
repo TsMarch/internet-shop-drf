@@ -24,11 +24,11 @@ from shop.views import ProductViewSet, CartViewSet
 shop_router = routers.DefaultRouter()
 shop_router.register("", ProductViewSet, basename="shop")
 cart_router = routers.DefaultRouter()
-cart_router.register(r"", CartViewSet, basename='cart')
-urlpatterns = [path("admin/", admin.site.urls),
-               path("shop/", include(shop_router.urls)),
-               path('cart/', include(cart_router.urls)),
-               #path('cart/<int:cart_id>/add/<int:product_id>/<int:quantity>', CartViewSet.as_view({"post":'add_item'}), name='cart-add-item')
-               #path('cart/<int:cart_id>/remove/<int:product_id>/', CartViewSet.as_view({'delete': 'remove'}), name='cart-remove-item'),
-               ]
-
+cart_router.register(r"", CartViewSet, basename="cart")
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("shop/", include(shop_router.urls)),
+    path("cart/", include(cart_router.urls)),
+    # path('cart/<int:cart_id>/add/<int:product_id>/<int:quantity>', CartViewSet.as_view({"post":'add_item'}), name='cart-add-item')
+    # path('cart/<int:cart_id>/add_product/<int:product_id>/', CartViewSet.as_view({'create': 'add_product'}), name='cart-add-item'),
+]

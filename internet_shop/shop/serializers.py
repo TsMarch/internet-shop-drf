@@ -39,7 +39,6 @@ class ProductSerializer(DynamicFieldsModelSerializer):
         return super().create(validated_data)
 
 
-
 class CartItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", required=False)
     product_id = serializers.IntegerField(source="product.id")
