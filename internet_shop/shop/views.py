@@ -42,7 +42,7 @@ class CartViewSet(ModelViewSet):
     serializer_action_classes = {"retrieve": CartSerializer}
 
     def retrieve(self, request, pk=None, *args, **kwargs):
-        cart = Cart.objects.get(pk=pk)
+        cart = self.queryset.get(pk=pk)
         for i in CartSerializer(cart).data["items"]:
             if i["quantity"] > i["product_available_quantity"]:
                 product = Product.objects.get(pk=i["product_id"])
@@ -52,15 +52,15 @@ class CartViewSet(ModelViewSet):
         serializer = CartSerializer(cart)
         return Response(serializer.data)
 
-    @staticmethod
-    def find_cart(cart_id: str, product_id: str):
-        cart = Cart.objects.get(pk=cart_id)
+
+    def find_cart(self, cart_id: str, product_id: str):
+        cart = self.queryset.objects.get(pk=cart_id)
         product = Product.objects.get(pk=product_id)
         return cart, product
 
-    @staticmethod
-    def validate_quantity(requested_quantity: int, cart, product, **kwargs):
-        cart_item = CartItems.objects.get(cart=cart, product=product)
+
+    def validate_quantity(self, requested_quantity: int, cart, product, **kwargs):
+        cart_item = self.queryset.objects.get(cart=cart, product=product)
         product_available_quantity = product.available_quantity
 
         match requested_quantity:
