@@ -8,8 +8,7 @@ from rest_framework.viewsets import ModelViewSet, ViewSet
 
 from .mixins import ModelViewMixin
 from .models import Cart, CartItems, Product
-from .serializers import (CartItemSerializer, CartSerializer,
-                          ProductListSerializer, ProductSerializer)
+from .serializers import CartItemSerializer, CartSerializer, ProductListSerializer, ProductSerializer
 
 
 class ProductViewSet(ModelViewMixin, ModelViewSet):
@@ -43,19 +42,22 @@ class CartViewSet(ModelViewSet):
 
     def retrieve(self, request, pk=None, *args, **kwargs):
         cart = Cart.objects.get(pk=pk)
+        prod_quant_dct = {}
         for i in CartSerializer(cart).data["items"]:
             if i["quantity"] > i["product_available_quantity"]:
-                product = Product.objects.get(pk=i["product_id"])
-                cart_item = CartItems.objects.get(cart=cart, product=i["product_id"])
-                cart_item.quantity = product.available_quantity
-                cart_item.save()
+                prod_quant_dct.setdefault(i['product_id'], i["product_available_quantity"])
+
+        for product in prod_quant_dct:
+            cart_item = CartItems.objects.get(cart=cart, product=product)
+            cart_item.quantity = prod_quant_dct[product]
+            cart_item.save()
         serializer = CartSerializer(cart)
         return Response(serializer.data)
 
     @staticmethod
     def find_cart(cart_id: str, product_id: str):
-        cart = Cart.objects.get(pk=cart_id)
-        product = Product.objects.get(pk=product_id)
+        cart = get_object_or_404(Cart, pk=cart_id)
+        product = get_object_or_404(Product, pk=product_id)
         return cart, product
 
     @staticmethod
@@ -65,65 +67,30 @@ class CartViewSet(ModelViewSet):
 
         match requested_quantity:
 
-            case 0:
-                if kwargs["action"] == "remove":
-                    cart_item.delete()
-
             case requested_quantity if requested_quantity < 0:
                 return Response({"error": "Invalid quantity"}, status=status.HTTP_400_BAD_REQUEST)
 
             case _:
-                if kwargs["action"] == "remove":
-                    if cart_item.quantity - requested_quantity == 0:
-                        cart_item.delete()
-                    else:
-                        cart_item.quantity -= requested_quantity
-                        cart_item.save()
-                elif kwargs["action"] == "add":
-                    if cart_item.quantity + requested_quantity > product_available_quantity:
-                        cart_item.quantity = product_available_quantity
-                        cart_item.save()
-                    else:
-                        cart_item.quantity += requested_quantity
-                        cart_item.save()
+                if cart_item.quantity > product_available_quantity:
+                    cart_item.quantity = product_available_quantity
+                    cart_item.save()
+                else:
+                    cart_item.save()
 
         return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["DELETE", "PATCH"])
-    def remove_item(self, request):
-        try:
-            cart, product = self.find_cart(request.data.get("cart_id"), request.data.get("product_id"))
-        except (Product.DoesNotExist, Cart.DoesNotExist) as error:
-            return Response({"Error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
-        match request.method:
-
-            case "DELETE":
-                try:
-                    cart_item = CartItems.objects.get(cart=cart, product=product)
-                    cart_item.delete()
-                    return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
-                except CartItems.DoesNotExist:
-                    return Response(CartSerializer(cart).data, status=status.HTTP_204_NO_CONTENT)
-
-            case "PATCH":
-                return self.validate_quantity(
-                    requested_quantity=request.data.get("quantity"), cart=cart, product=product, action="remove"
-                )
-
-    @action(detail=False, methods=["POST", "PATCH"])
-    def add_item(self, request):
-        try:
-            cart, product = self.find_cart(request.data.get("cart_id"), request.data.get("product_id"))
-        except (Product.DoesNotExist, Cart.DoesNotExist) as error:
-            return Response({"Error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=False, methods=["POST", "PATCH", "DELETE"])
+    def item(self, request):
+        cart, product = self.find_cart(request.data.get("cart_id"), request.data.get("product_id"))
+        if request.data.get('quantity'):
+            return self.validate_quantity(requested_quantity=request.data.get("quantity"), cart=cart, product=product)
 
         match request.method:
 
             case "POST":
                 try:
                     return self.validate_quantity(
-                        requested_quantity=request.data.get("quantity"), cart=cart, product=product, action="add"
+                        requested_quantity=request.data.get("quantity"), cart=cart, product=product
                     )
                 except CartItems.DoesNotExist:
                     CartItems.objects.create(cart=cart, product=product, quantity=1)
@@ -132,5 +99,12 @@ class CartViewSet(ModelViewSet):
 
             case "PATCH":
                 return self.validate_quantity(
-                    requested_quantity=request.data.get("quantity"), cart=cart, product=product, action="add"
+                    requested_quantity=request.data.get("quantity"), cart=cart, product=product
                 )
+
+            case "DELETE":
+                try:
+                    CartItems.objects.filter(cart=cart, product=product).delete()
+                    return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
+                except CartItems.DoesNotExist:
+                    return Response(CartSerializer(cart).data, status=status.HTTP_204_NO_CONTENT)
