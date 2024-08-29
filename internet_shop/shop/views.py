@@ -36,13 +36,17 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
 
 class CartViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = Cart.objects.all()
+    #queryset = Cart.objects.all()
     serializer_class = CartSerializer
     serializer_action_classes = {"retrieve": CartSerializer}
 
+    def get_queryset(self):
+        return Cart.objects.filter(user=self.request.user)
+
     def retrieve(self, request, pk=None, *args, **kwargs):
-        cart = Cart.objects.get(pk=pk)
+        cart = get_object_or_404(self.get_queryset(), pk=pk)
         prod_quant_dct = {}
+        print(cart)
         for i in CartSerializer(cart).data["items"]:
             if i["quantity"] > i["product_available_quantity"]:
                 prod_quant_dct.setdefault(i['product_id'], i["product_available_quantity"])
@@ -54,9 +58,8 @@ class CartViewSet(ModelViewSet):
         serializer = CartSerializer(cart)
         return Response(serializer.data)
 
-    @staticmethod
-    def find_cart(cart_id: str, product_id: str):
-        cart = get_object_or_404(Cart, pk=cart_id)
+    def find_cart(self, cart_id: str, product_id: str):
+        cart = get_object_or_404(self.queryset, pk=cart_id)
         product = get_object_or_404(Product, pk=product_id)
         return cart, product
 
@@ -82,8 +85,6 @@ class CartViewSet(ModelViewSet):
     @action(detail=False, methods=["POST", "PATCH", "DELETE"])
     def item(self, request):
         cart, product = self.find_cart(request.data.get("cart_id"), request.data.get("product_id"))
-        if request.data.get('quantity'):
-            return self.validate_quantity(requested_quantity=request.data.get("quantity"), cart=cart, product=product)
 
         match request.method:
 
@@ -94,8 +95,7 @@ class CartViewSet(ModelViewSet):
                     )
                 except CartItems.DoesNotExist:
                     CartItems.objects.create(cart=cart, product=product, quantity=1)
-
-                return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
+                    return self.validate_quantity(requested_quantity=request.data.get("quantity"), cart=cart, product=product)
 
             case "PATCH":
                 return self.validate_quantity(
