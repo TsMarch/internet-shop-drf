@@ -53,3 +53,10 @@ class CartItems(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
     added_at = models.DateTimeField(auto_now_add=True)
+
+
+class Order(models.Model):
+    cart_items = models.ForeignKey(CartItems, related_name='items', on_delete=models.CASCADE)
+    cart_sum = models.DecimalField(
+        "Стоимость корзины", decimal_places=2, max_digits=10, null=True, blank=True, editable=False
+    )
