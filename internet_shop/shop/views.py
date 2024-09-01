@@ -1,14 +1,13 @@
-from django.shortcuts import get_object_or_404, render
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import generics, status
+from django.shortcuts import get_object_or_404
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet, ViewSet
+from rest_framework.viewsets import ModelViewSet
 
 from .mixins import ModelViewMixin
 from .models import Cart, CartItems, Product
-from .serializers import CartItemSerializer, CartSerializer, ProductListSerializer, ProductSerializer
+from .serializers import CartSerializer, ProductListSerializer, ProductSerializer
 
 
 class ProductViewSet(ModelViewMixin, ModelViewSet):
@@ -36,7 +35,6 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
 
 class CartViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
-    #queryset = Cart.objects.all()
     serializer_class = CartSerializer
     serializer_action_classes = {"retrieve": CartSerializer}
 
@@ -46,7 +44,6 @@ class CartViewSet(ModelViewSet):
     def retrieve(self, request, pk=None, *args, **kwargs):
         cart = get_object_or_404(self.get_queryset(), pk=pk)
         prod_quant_dct = {}
-        print(cart)
         for i in CartSerializer(cart).data["items"]:
             if i["quantity"] > i["product_available_quantity"]:
                 prod_quant_dct.setdefault(i['product_id'], i["product_available_quantity"])
