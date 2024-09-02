@@ -4,7 +4,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-
 from .mixins import ModelViewMixin
 from .models import Cart, CartItems, Product, Order
 from .serializers import CartSerializer, ProductListSerializer, ProductSerializer, OrderSerializer
@@ -108,10 +107,6 @@ class CartViewSet(ModelViewSet):
 
 
 class OrderViewSet(ModelViewSet):
+    permission_classes = [IsAuthenticated]
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-
-    @action(detail=False, methods=["POST", "PATCH", "DELETE"])
-    def order(self, request):
-        return OrderSerializer(self.queryset)
-

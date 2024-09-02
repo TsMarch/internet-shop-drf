@@ -56,7 +56,18 @@ class CartItems(models.Model):
 
 
 class Order(models.Model):
-    cart_items = models.ForeignKey(CartItems, related_name='items', on_delete=models.CASCADE)
-    cart_sum = models.DecimalField(
-        "Стоимость корзины", decimal_places=2, max_digits=10, null=True, blank=True, editable=False
-    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    total_price = models.DecimalField("Общая цена", decimal_places=2, max_digits=10)
+
+    class Meta:
+        verbose_name_plural = "Заказы"
+
+
+class OrderItems(models.Model):
+    order = models.ForeignKey(Order, related_name='order', on_delete=models.CASCADE)
+    cart = models.ForeignKey(Cart, on_delete=models.CASCADE)
+    price_at_purchase = models.DecimalField("Цена на момент покупки", decimal_places=2, max_digits=10)
+
+    class Meta:
+        verbose_name_plural = "Корзина юзера"
