@@ -8,13 +8,13 @@ class ProductAdmin(admin.ModelAdmin):
     exclude = ["price"]
 
 
-class CartItemsInline(admin.TabularInline):
+class CartItemsInlineAdmin(admin.TabularInline):
     model = CartItems
     extra = 1
 
 
 class CartAdmin(admin.ModelAdmin):
-    inlines = [CartItemsInline]
+    inlines = [CartItemsInlineAdmin]
 
 
 admin.site.register(Product, ProductAdmin)

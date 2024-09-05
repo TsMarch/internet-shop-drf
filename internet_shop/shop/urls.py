@@ -8,5 +8,11 @@ shop_router = routers.DefaultRouter()
 shop_router.register("", ProductViewSet, basename="product")
 cart_router = routers.DefaultRouter()
 cart_router.register(r"", CartViewSet, basename="cart")
+# order_router = routers.DefaultRouter()
+# order_router.register(r'', OrderViewSet, basename='order')
 
-urlpatterns = [path("product/", include(shop_router.urls)), path("cart/", include(cart_router.urls))]
+urlpatterns = [
+    path("product/", include(shop_router.urls)),
+    path("cart/", include(cart_router.urls)),
+    # path('order/', include(order_router.urls))
+]

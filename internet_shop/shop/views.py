@@ -4,7 +4,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-
 from .mixins import ModelViewMixin
 from .models import Cart, CartItems, Product
 from .serializers import CartSerializer, ProductListSerializer, ProductSerializer
@@ -39,14 +38,15 @@ class CartViewSet(ModelViewSet):
     serializer_action_classes = {"retrieve": CartSerializer}
 
     def get_queryset(self):
-        return Cart.objects.filter(user=self.request.user)
+        user_cart, created = Cart.objects.get_or_create(user=self.request.user)
+        return user_cart
 
     def retrieve(self, request, pk=None, *args, **kwargs):
-        cart = get_object_or_404(self.get_queryset(), pk=pk)
+        cart = self.get_queryset()
         prod_quant_dct = {}
         for i in CartSerializer(cart).data["items"]:
             if i["quantity"] > i["product_available_quantity"]:
-                prod_quant_dct.setdefault(i['product_id'], i["product_available_quantity"])
+                prod_quant_dct.setdefault(i["product_id"], i["product_available_quantity"])
 
         for product in prod_quant_dct:
             cart_item = CartItems.objects.get(cart=cart, product=product)
@@ -55,8 +55,8 @@ class CartViewSet(ModelViewSet):
         serializer = CartSerializer(cart)
         return Response(serializer.data)
 
-    def find_cart(self, cart_id: str, product_id: str):
-        cart = get_object_or_404(self.queryset, pk=cart_id)
+    def find_cart(self, product_id: str):
+        cart = self.get_queryset()
         product = get_object_or_404(Product, pk=product_id)
         return cart, product
 
@@ -81,8 +81,7 @@ class CartViewSet(ModelViewSet):
 
     @action(detail=False, methods=["POST", "PATCH", "DELETE"])
     def item(self, request):
-        cart, product = self.find_cart(request.data.get("cart_id"), request.data.get("product_id"))
-
+        cart, product = self.find_cart(product_id=request.data.get("product_id"))
         match request.method:
 
             case "POST":
@@ -92,7 +91,9 @@ class CartViewSet(ModelViewSet):
                     )
                 except CartItems.DoesNotExist:
                     CartItems.objects.create(cart=cart, product=product, quantity=1)
-                    return self.validate_quantity(requested_quantity=request.data.get("quantity"), cart=cart, product=product)
+                    return self.validate_quantity(
+                        requested_quantity=request.data.get("quantity"), cart=cart, product=product
+                    )
 
             case "PATCH":
                 return self.validate_quantity(
