@@ -1,8 +1,5 @@
-from django.shortcuts import get_object_or_404
-from rest_framework import serializers, status
-from rest_framework.response import Response
-
-from .models import Cart, CartItems, Product, Order, OrderItems
+from rest_framework import serializers
+from .models import Cart, CartItems, Product, Order
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
@@ -58,19 +55,8 @@ class CartSerializer(serializers.ModelSerializer):
         fields = ["id", "user", "items"]
 
 
-class OrderItemSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source="product.name", required=False)
-    product_id = serializers.IntegerField(source="product.id")
-    product_price = serializers.IntegerField(source="product.price", required=False)
-
-    class Meta:
-        model = OrderItems
-        fields = ["product_name", "product_id", "product_price", "quantity", "added_at"]
-
-
 class OrderSerializer(serializers.ModelSerializer):
-    items = OrderItemSerializer()
 
     class Meta:
         model = Order
-        fields = ["id", "items"]
+        fields = "__all__"
