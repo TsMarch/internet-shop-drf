@@ -35,11 +35,15 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
 class CartViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = CartSerializer
-    serializer_action_classes = {"retrieve": CartSerializer}
 
     def get_queryset(self):
-        user_cart, created = Cart.objects.get_or_create(user=self.request.user)
+        user_cart, _ = Cart.objects.get_or_create(user=self.request.user)
         return user_cart
+
+    def list(self, request, *args, **kwargs):
+        cart = self.get_queryset()
+        serializer = CartSerializer(cart)
+        return Response(serializer.data)
 
     def retrieve(self, request, pk=None, *args, **kwargs):
         cart = self.get_queryset()
