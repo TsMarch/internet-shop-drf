@@ -5,8 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from .mixins import ModelViewMixin
-from .models import Cart, CartItems, Product, Order
-from .serializers import CartSerializer, ProductListSerializer, ProductSerializer, OrderSerializer
+from .models import Cart, CartItems, Product, Order, OrderItems
+from .serializers import CartSerializer, ProductListSerializer, ProductSerializer, OrderSerializer, CartItemSerializer
 
 
 class ProductViewSet(ModelViewMixin, ModelViewSet):
@@ -35,11 +35,15 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
 class CartViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = CartSerializer
-    serializer_action_classes = {"retrieve": CartSerializer}
 
     def get_queryset(self):
-        user_cart, created = Cart.objects.get_or_create(user=self.request.user)
+        user_cart, _ = Cart.objects.get_or_create(user=self.request.user)
         return user_cart
+
+    def list(self, request, *args, **kwargs):
+        cart = self.get_queryset()
+        serializer = CartSerializer(cart)
+        return Response(serializer.data)
 
     def retrieve(self, request, pk=None, *args, **kwargs):
         cart = self.get_queryset()
@@ -63,7 +67,6 @@ class CartViewSet(ModelViewSet):
     @staticmethod
     def validate_quantity(requested_quantity: int, cart, product, **kwargs):
         cart_item = CartItems.objects.get(cart=cart, product=product)
-        product_available_quantity = product.available_quantity
 
         match requested_quantity:
 
@@ -71,8 +74,10 @@ class CartViewSet(ModelViewSet):
                 return Response({"error": "Invalid quantity"}, status=status.HTTP_400_BAD_REQUEST)
 
             case _:
-                if cart_item.quantity > product_available_quantity:
-                    cart_item.quantity = product_available_quantity
+                cart_item.price = product.price
+                cart_item.save()
+                if cart_item.quantity > product.available_quantity:
+                    cart_item.quantity = product.available_quantity
                     cart_item.save()
                 else:
                     cart_item.save()
@@ -113,18 +118,50 @@ class OrderViewSet(ModelViewSet):
     serializer_class = OrderSerializer
     serializer_action_classes = {"retrieve": OrderSerializer}
 
-    def get_queryset(self):
-        user_order, created = Order.objects.get_or_create(user=self.request.user)
-        return user_order
+    def get_queryset(self, **kwargs):
+        match kwargs.get('action', None):
+            case 'create':
+                order = Order.objects.create(user=self.request.user)
+                return order
+            case 'delete':
+                order = get_object_or_404(Order, id=kwargs.get('id'))
+                return order
+            case 'list':
+                orders = Order.objects.filter(user=self.request.user)
+                return orders
+            case _:
+                user_cart = Cart.objects.filter(user=self.request.user).first()
+                return user_cart
+
+    def list(self, request, *args, **kwargs):
+        orders = self.get_queryset(action='list')
+        serializer = OrderSerializer(orders, many=True)
+        return Response(serializer.data)
+
+    def retrieve(self, request, pk=None, *args, **kwargs):
+        order = Order.objects.get(user=self.request.user)
+        return Response(OrderSerializer(order).data)
 
     def find_cart(self):
         cart = self.get_queryset()
         return cart
 
-    @action(detail=False, methods=["POST"])
-    def item(self, request):
-        cart = self.find_cart()
+    @action(detail=False, methods=["GET"])
+    def create_order(self, request):
+        cart = self.get_queryset()
+        cart_items = CartItems.objects.filter(cart=cart)
+        order = self.get_queryset(action='create')
+        order_items = OrderItems.objects.filter(order=order)
         match request.method:
 
-            case "POST":
-                pass
+            case "GET":
+                for item in cart_items:
+                    OrderItems.objects.create(order=order, price=item.price, product_id=item.product_id)
+                return Response(OrderSerializer(order).data)
+
+    @action(detail=False, methods=["DELETE"])
+    def delete(self, request, pk=None):
+        print(request.data)
+        order = self.get_queryset(action='delete', id=request.data['id'])
+        order.delete()
+        return Response(status=204)

@@ -51,12 +51,24 @@ class Cart(models.Model):
 class CartItems(models.Model):
     cart = models.ForeignKey(Cart, related_name="items", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    price = models.DecimalField(
+        "Цена со скидкой", decimal_places=2, max_digits=10, null=True, blank=True, editable=False
+    )
     quantity = models.PositiveIntegerField(default=1)
     added_at = models.DateTimeField(auto_now_add=True)
 
 
 class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    active_flag = models.BooleanField(blank=True, default=True)
+    delivery_flag = models.BooleanField(blank=True, default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class OrderItems(models.Model):
+    order = models.ForeignKey(Order, related_name="orderitems", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
-
-
+    price = models.DecimalField(
+        "Цена со скидкой", decimal_places=2, max_digits=10, null=True, blank=True, editable=False
+    )
+    quantity = models.PositiveIntegerField(default=1)
