@@ -116,51 +116,25 @@ class CartViewSet(ModelViewSet):
 class OrderViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = OrderSerializer
-    serializer_action_classes = {"retrieve": OrderSerializer}
 
     def get_queryset(self, **kwargs):
-        if not kwargs: return Order.objects.filter(user=self.request.user)
-        match kwargs.get('action', None):
-            case 'create':
-                order = Order.objects.create(user=self.request.user)
-                return order
-            case 'list':
-                orders = Order.objects.filter(user=self.request.user)
-                return orders
-            case 'cart':
-                user_cart = Cart.objects.filter(user=self.request.user).first()
-                return user_cart
-            case _:
-                order = Order.objects.filter(user=self.request.user, id=kwargs.get('id'))
-                return order
+        return Order.objects.filter(user=self.request.user)
 
-    def list(self, request, *args, **kwargs):
-        orders = self.get_queryset(action='list')
-        serializer = OrderSerializer(orders, many=True)
-        return Response(serializer.data)
-
-    @action(detail=False, methods=["GET", "PATCH"])
+    @action(detail=False, methods=["POST", "PATCH"])
     def order(self, request):
-        cart = self.get_queryset(action='cart')
-        cart_items = CartItems.objects.filter(cart=cart)
+        cart_items = CartItems.objects.filter(cart__user=self.request.user)
         match request.method:
 
-            case "GET":
-                order = self.get_queryset(action='create')
+            case "POST":
+                order = Order.objects.create(user=self.request.user)
+                order_items = []
                 for item in cart_items:
-                    OrderItems.objects.create(order=order, price=item.price, product_id=item.product_id)
-                cart.delete()
+                    order_items.append(OrderItems(order=order, price=item.price, product_id=item.product_id))
+                OrderItems.objects.bulk_create(order_items)
                 cart_items.delete()
                 return Response(OrderSerializer(order).data)
 
             case "PATCH":
-                order = self.get_queryset(id=request.data['id'])
+                order = Order.objects.filter(user=self.request.user, id=request.data['id'])
                 order.update(active_flag=request.data['active_flag'])
                 return Response(OrderSerializer(order, many=True).data)
-
-    @action(detail=False, methods=["DELETE"])
-    def delete(self, request):
-        print(request.data)
-        order = self.get_queryset(id=request.data['id'])
-        order.delete()
-        return Response({"Status": "deleted"}, status=204)

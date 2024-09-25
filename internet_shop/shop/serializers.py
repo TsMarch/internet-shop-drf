@@ -58,7 +58,7 @@ class CartSerializer(serializers.ModelSerializer):
 class OrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", required=False)
     product_id = serializers.IntegerField(source="product.id")
-    product_price = serializers.IntegerField(source="product.price", required=False)
+    product_price = serializers.IntegerField(source="price", required=False)
 
     class Meta:
         model = OrderItems
