@@ -59,10 +59,11 @@ class OrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", required=False)
     product_id = serializers.IntegerField(source="product.id")
     product_price = serializers.IntegerField(source="price", required=False)
+    product_quantity = serializers.IntegerField(source='quantity', required=False)
 
     class Meta:
         model = OrderItems
-        fields = ["product_name", "product_id", "product_price"]
+        fields = ["product_name", "product_id", "product_price", 'quantity']
 
 
 class OrderSerializer(serializers.ModelSerializer):
