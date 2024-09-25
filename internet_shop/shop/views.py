@@ -5,8 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from .mixins import ModelViewMixin
-from .models import Cart, CartItems, Product
-from .serializers import CartSerializer, ProductListSerializer, ProductSerializer
+from .models import Cart, CartItems, Product, Order, OrderItems
+from .serializers import CartSerializer, ProductListSerializer, ProductSerializer, OrderSerializer, CartItemSerializer
 
 
 class ProductViewSet(ModelViewMixin, ModelViewSet):
@@ -67,7 +67,6 @@ class CartViewSet(ModelViewSet):
     @staticmethod
     def validate_quantity(requested_quantity: int, cart, product, **kwargs):
         cart_item = CartItems.objects.get(cart=cart, product=product)
-        product_available_quantity = product.available_quantity
 
         match requested_quantity:
 
@@ -75,8 +74,10 @@ class CartViewSet(ModelViewSet):
                 return Response({"error": "Invalid quantity"}, status=status.HTTP_400_BAD_REQUEST)
 
             case _:
-                if cart_item.quantity > product_available_quantity:
-                    cart_item.quantity = product_available_quantity
+                cart_item.price = product.price
+                cart_item.save()
+                if cart_item.quantity > product.available_quantity:
+                    cart_item.quantity = product.available_quantity
                     cart_item.save()
                 else:
                     cart_item.save()
@@ -110,3 +111,30 @@ class CartViewSet(ModelViewSet):
                     return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
                 except CartItems.DoesNotExist:
                     return Response(CartSerializer(cart).data, status=status.HTTP_204_NO_CONTENT)
+
+
+class OrderViewSet(ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderSerializer
+
+    def get_queryset(self, **kwargs):
+        return Order.objects.filter(user=self.request.user)
+
+    @action(detail=False, methods=["POST", "PATCH"])
+    def order(self, request):
+        cart_items = CartItems.objects.filter(cart__user=self.request.user)
+        match request.method:
+
+            case "POST":
+                order = Order.objects.create(user=self.request.user)
+                order_items = []
+                for item in cart_items:
+                    order_items.append(OrderItems(order=order, price=item.price, product_id=item.product_id))
+                OrderItems.objects.bulk_create(order_items)
+                cart_items.delete()
+                return Response(OrderSerializer(order).data)
+
+            case "PATCH":
+                order = Order.objects.filter(user=self.request.user, id=request.data['id'])
+                order.update(active_flag=request.data['active_flag'])
+                return Response(OrderSerializer(order, many=True).data)
