@@ -21,7 +21,12 @@ class Product(models.Model):
     old_price = models.DecimalField("Цена без скидки", decimal_places=2, max_digits=10)
     discount = models.PositiveIntegerField("Процент скидки")
     price = models.DecimalField(
-        "Цена со скидкой", decimal_places=2, max_digits=10, null=True, blank=True, editable=False
+        "Цена со скидкой",
+        decimal_places=2,
+        max_digits=10,
+        null=True,
+        blank=True,
+        editable=False,
     )
     available = models.BooleanField("Доступность товара", default=True)
     available_quantity = models.PositiveIntegerField("Остаток товара на складе", default=0)
@@ -52,7 +57,12 @@ class CartItems(models.Model):
     cart = models.ForeignKey(Cart, related_name="items", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     price = models.DecimalField(
-        "Цена со скидкой", decimal_places=2, max_digits=10, null=True, blank=True, editable=False
+        "Цена со скидкой",
+        decimal_places=2,
+        max_digits=10,
+        null=True,
+        blank=True,
+        editable=False,
     )
     quantity = models.PositiveIntegerField(default=1)
     added_at = models.DateTimeField(auto_now_add=True)
@@ -69,6 +79,11 @@ class OrderItems(models.Model):
     order = models.ForeignKey(Order, related_name="orderitems", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     price = models.DecimalField(
-        "Цена со скидкой", decimal_places=2, max_digits=10, null=True, blank=True, editable=False
+        "Цена со скидкой",
+        decimal_places=2,
+        max_digits=10,
+        null=True,
+        blank=True,
+        editable=False,
     )
     quantity = models.PositiveIntegerField(default=1)

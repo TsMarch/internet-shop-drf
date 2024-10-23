@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Cart, CartItems, Product, Order, OrderItems
+
+from .models import Cart, CartItems, Order, OrderItems, Product
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
@@ -44,7 +45,14 @@ class CartItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CartItems
-        fields = ["product_name", "product_id", "product_price", "product_available_quantity", "quantity", "added_at"]
+        fields = [
+            "product_name",
+            "product_id",
+            "product_price",
+            "product_available_quantity",
+            "quantity",
+            "added_at",
+        ]
 
 
 class CartSerializer(serializers.ModelSerializer):
