@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework import routers
 
-from .views import CartViewSet, ProductViewSet, OrderViewSet, HelloWorld
+from .views import CartViewSet, ProductViewSet, OrderViewSet
 
 shop_router = routers.DefaultRouter()
 shop_router.register("", ProductViewSet, basename="product")
