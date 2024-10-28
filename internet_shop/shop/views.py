@@ -6,13 +6,23 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from .mixins import ModelViewMixin
-from .models import Cart, CartItems, Order, OrderItems, Product
+from .models import Cart, CartItems, Order, OrderItems, Product, User
 from .serializers import (
     CartSerializer,
     OrderSerializer,
     ProductListSerializer,
     ProductSerializer,
+    UserRegistrationSerializer,
 )
+
+
+class UserRegistrationViewSet(ModelViewSet):
+    serializer_class = UserRegistrationSerializer
+    queryset = User.objects.all()
+    serializer_action_classes = {
+        "list": UserRegistrationSerializer,
+        "create": UserRegistrationSerializer,
+    }
 
 
 class ProductViewSet(ModelViewMixin, ModelViewSet):
