@@ -4,9 +4,25 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+
 from .mixins import ModelViewMixin
-from .models import Cart, CartItems, Product, Order, OrderItems
-from .serializers import CartSerializer, ProductListSerializer, ProductSerializer, OrderSerializer, CartItemSerializer
+from .models import Cart, CartItems, Order, OrderItems, Product, User
+from .serializers import (
+    CartSerializer,
+    OrderSerializer,
+    ProductListSerializer,
+    ProductSerializer,
+    UserRegistrationSerializer,
+)
+
+
+class UserRegistrationViewSet(ModelViewSet):
+    serializer_class = UserRegistrationSerializer
+    queryset = User.objects.all()
+    serializer_action_classes = {
+        "list": UserRegistrationSerializer,
+        "create": UserRegistrationSerializer,
+    }
 
 
 class ProductViewSet(ModelViewMixin, ModelViewSet):
@@ -69,7 +85,6 @@ class CartViewSet(ModelViewSet):
         cart_item = CartItems.objects.get(cart=cart, product=product)
 
         match requested_quantity:
-
             case requested_quantity if requested_quantity < 0:
                 return Response({"error": "Invalid quantity"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -88,21 +103,26 @@ class CartViewSet(ModelViewSet):
     def item(self, request):
         cart, product = self.find_cart(product_id=request.data.get("product_id"))
         match request.method:
-
             case "POST":
                 try:
                     return self.validate_quantity(
-                        requested_quantity=request.data.get("quantity"), cart=cart, product=product
+                        requested_quantity=request.data.get("quantity"),
+                        cart=cart,
+                        product=product,
                     )
                 except CartItems.DoesNotExist:
                     CartItems.objects.create(cart=cart, product=product, quantity=1)
                     return self.validate_quantity(
-                        requested_quantity=request.data.get("quantity"), cart=cart, product=product
+                        requested_quantity=request.data.get("quantity"),
+                        cart=cart,
+                        product=product,
                     )
 
             case "PATCH":
                 return self.validate_quantity(
-                    requested_quantity=request.data.get("quantity"), cart=cart, product=product
+                    requested_quantity=request.data.get("quantity"),
+                    cart=cart,
+                    product=product,
                 )
 
             case "DELETE":
@@ -124,7 +144,6 @@ class OrderViewSet(ModelViewSet):
     def order(self, request):
         cart_items = CartItems.objects.filter(cart__user=self.request.user)
         match request.method:
-
             case "POST":
                 order = Order.objects.create(user=self.request.user)
                 order_items = []
@@ -135,6 +154,6 @@ class OrderViewSet(ModelViewSet):
                 return Response(OrderSerializer(order).data)
 
             case "PATCH":
-                order = Order.objects.filter(user=self.request.user, id=request.data['id'])
-                order.update(active_flag=request.data['active_flag'])
+                order = Order.objects.filter(user=self.request.user, id=request.data["id"])
+                order.update(active_flag=request.data["active_flag"])
                 return Response(OrderSerializer(order, many=True).data)

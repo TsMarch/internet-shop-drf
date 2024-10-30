@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import Cart, CartItems, Product, ProductCategory
 
+
 class ProductAdmin(admin.ModelAdmin):
     model = Product
     exclude = ["price"]
@@ -14,8 +15,6 @@ class CartItemsInlineAdmin(admin.TabularInline):
 
 class CartAdmin(admin.ModelAdmin):
     inlines = [CartItemsInlineAdmin]
-
-
 
 
 admin.site.register(Product, ProductAdmin)
