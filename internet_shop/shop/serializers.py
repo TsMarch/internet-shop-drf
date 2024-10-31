@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Cart, CartItems, Order, OrderItems, Product
+from .models import Cart, CartItems, Order, OrderItems, Product, UserBalance
 
 User = get_user_model()
 
@@ -34,7 +34,7 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
 class ProductListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
-        fields = ["id", "name", "price", "old_price"]
+        fields = ["id", "name", "price", "old_price", "available_quantity"]
 
 
 class ProductSerializer(DynamicFieldsModelSerializer):
@@ -95,4 +95,10 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
+        fields = "__all__"
+
+
+class UserBalanceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserBalance
         fields = "__all__"

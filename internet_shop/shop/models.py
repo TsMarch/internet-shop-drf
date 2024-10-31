@@ -87,3 +87,8 @@ class OrderItems(models.Model):
         editable=False,
     )
     quantity = models.PositiveIntegerField(default=1)
+
+
+class UserBalance(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    balance = models.DecimalField("Баланс юзера", decimal_places=6, max_digits=20, null=False)

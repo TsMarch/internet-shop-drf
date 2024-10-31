@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import action
@@ -6,14 +8,48 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from .mixins import ModelViewMixin
-from .models import Cart, CartItems, Order, OrderItems, Product, User
+from .models import Cart, CartItems, Order, OrderItems, Product, User, UserBalance
 from .serializers import (
     CartSerializer,
     OrderSerializer,
     ProductListSerializer,
     ProductSerializer,
     UserRegistrationSerializer,
+    UserBalanceSerializer
 )
+
+
+class UserBalanceViewSet(ModelViewSet):
+    serializer_class = UserBalanceSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user_balance, _ = UserBalance.objects.get_or_create(user=self.request.user)
+        return user_balance
+
+    def list(self, request, *args, **kwargs):
+        user_balance = self.get_queryset()
+        serializer = UserBalanceSerializer(user_balance)
+        return Response(serializer.data)
+
+    @staticmethod
+    def check_balance(cur_balance, amount):
+        if cur_balance - amount * -1 < 0:
+            raise ValueError
+
+    @action(detail=False, methods=['PATCH'])
+    def change_balance(self, request, *args, **kwargs):
+        user_balance = self.get_queryset()
+        amount = Decimal(request.data.get('amount'))
+        if str(amount)[0] == '-':
+            try:
+                self.check_balance(user_balance.balance, amount)
+            except ValueError:
+                return Response({"error": "not enough money for transaction"}, status=status.HTTP_400_BAD_REQUEST)
+        user_balance.balance += amount
+        user_balance.save()
+        serializer = self.get_serializer(user_balance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class UserRegistrationViewSet(ModelViewSet):
@@ -33,6 +69,19 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         "create": ProductSerializer,
         "retrieve": ProductSerializer,
     }
+
+    @action(methods=["PATCH"], detail=False)
+    def update_quantity(self, request, *args, **kwargs):
+        products = self.queryset
+        new_quantity = request.data.get('available_quantity')
+        product_id = request.data.get('id')
+        if product_id:
+            product = products.filter(id=product_id)
+            product.available_quantity = new_quantity
+            product.save()
+            serializer = self.get_serializer(products.filter(id=product_id), many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({"error": "no product id in request body"}, status=status.HTTP_404_NOT_FOUND)
 
     @action(methods=["GET"], detail=False)
     def search(self, request):
