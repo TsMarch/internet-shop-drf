@@ -55,7 +55,7 @@ class ProductSerializer(DynamicFieldsModelSerializer):
 
 class CartItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", required=False)
-    product_id = serializers.IntegerField(source="product.id")
+    product_id = serializers.IntegerField(source="product.id", read_only=True)
     product_price = serializers.IntegerField(source="product.price", required=False)
     product_available_quantity = serializers.IntegerField(source="product.available_quantity", required=False)
 
@@ -87,7 +87,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrderItems
-        fields = ["product_name", "product_id", "product_price", 'quantity']
+        fields = ["product_name", "product_id", "product_price", 'product_quantity']
 
 
 class OrderSerializer(serializers.ModelSerializer):

@@ -102,7 +102,7 @@ class CartViewSet(ModelViewSet):
     serializer_class = CartSerializer
 
     def get_queryset(self):
-        user_cart, _ = Cart.objects.get_or_create(user=self.request.user)
+        user_cart, _ = Cart.objects.get_or_create(user=1)
         return user_cart
 
     def list(self, request, *args, **kwargs):
@@ -151,18 +151,19 @@ class CartViewSet(ModelViewSet):
     @action(detail=False, methods=["POST", "PATCH", "DELETE"])
     def item(self, request):
         cart, product = self.find_cart(product_id=request.data.get("product_id"))
+        requested_quantity = int(request.data.get("quantity"))
         match request.method:
             case "POST":
                 try:
                     return self.validate_quantity(
-                        requested_quantity=request.data.get("quantity"),
+                        requested_quantity=requested_quantity,
                         cart=cart,
                         product=product,
                     )
                 except CartItems.DoesNotExist:
                     CartItems.objects.create(cart=cart, product=product, quantity=1)
                     return self.validate_quantity(
-                        requested_quantity=request.data.get("quantity"),
+                        requested_quantity=requested_quantity,
                         cart=cart,
                         product=product,
                     )
@@ -189,7 +190,7 @@ class OrderViewSet(ModelViewSet):
     def get_queryset(self, **kwargs):
         return Order.objects.filter(user=self.request.user)
 
-    @action(detail=False, methods=["POST", "PATCH"])
+    @action(detail=False, methods=["POST", "PATCH", "DELETE"])
     def order(self, request):
         cart_items = CartItems.objects.filter(cart__user=self.request.user)
         match request.method:
@@ -206,3 +207,9 @@ class OrderViewSet(ModelViewSet):
                 order = Order.objects.filter(user=self.request.user, id=request.data["id"])
                 order.update(active_flag=request.data["active_flag"])
                 return Response(OrderSerializer(order, many=True).data)
+
+            case "DELETE":
+                orders = Order.objects.filter(user=self.request.user)
+                for i in orders:
+                    i.delete()
+                return Response({"status": "deleted orders successfully"}, status=status.HTTP_200_OK)
