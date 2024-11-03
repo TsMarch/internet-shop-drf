@@ -76,7 +76,7 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         new_quantity = request.data.get('available_quantity')
         product_id = request.data.get('id')
         if product_id:
-            product = products.filter(id=product_id)
+            product = products.get(id=product_id)
             product.available_quantity = new_quantity
             product.save()
             serializer = self.get_serializer(products.filter(id=product_id), many=True)
@@ -144,6 +144,7 @@ class CartViewSet(ModelViewSet):
                     cart_item.quantity = product.available_quantity
                     cart_item.save()
                 else:
+                    cart_item.quantity = requested_quantity
                     cart_item.save()
 
         return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
@@ -190,17 +191,19 @@ class OrderViewSet(ModelViewSet):
     def get_queryset(self, **kwargs):
         return Order.objects.filter(user=self.request.user)
 
-    @action(detail=False, methods=["POST", "PATCH", "DELETE"])
+    @action(detail=False, methods=["GET", "PATCH", "DELETE"])
     def order(self, request):
         cart_items = CartItems.objects.filter(cart__user=self.request.user)
+        user_balance = UserBalance.objects.get(user=self.request.user)
+        print(user_balance.balance)
         match request.method:
-            case "POST":
+            case "GET":
                 order = Order.objects.create(user=self.request.user)
                 order_items = []
                 for item in cart_items:
                     order_items.append(OrderItems(order=order, price=item.price, product_id=item.product_id))
                 OrderItems.objects.bulk_create(order_items)
-                cart_items.delete()
+                #cart_items.delete()
                 return Response(OrderSerializer(order).data)
 
             case "PATCH":
