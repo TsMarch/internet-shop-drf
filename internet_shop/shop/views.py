@@ -15,7 +15,7 @@ from .serializers import (
     ProductListSerializer,
     ProductSerializer,
     UserRegistrationSerializer,
-    UserBalanceSerializer
+    UserBalanceSerializer, CartItemSerializer
 )
 
 
@@ -191,17 +191,20 @@ class OrderViewSet(ModelViewSet):
     def get_queryset(self, **kwargs):
         return Order.objects.filter(user=self.request.user)
 
+    @staticmethod
+    def validate_order(**kwargs):
+        pass
+
     @action(detail=False, methods=["GET", "PATCH", "DELETE"])
     def order(self, request):
         cart_items = CartItems.objects.filter(cart__user=self.request.user)
         user_balance = UserBalance.objects.get(user=self.request.user)
-        print(user_balance.balance)
         match request.method:
             case "GET":
                 order = Order.objects.create(user=self.request.user)
                 order_items = []
                 for item in cart_items:
-                    order_items.append(OrderItems(order=order, price=item.price, product_id=item.product_id))
+                    order_items.append(OrderItems(order=order, price=item.price, product_id=item.product_id, quantity=item.quantity))
                 OrderItems.objects.bulk_create(order_items)
                 #cart_items.delete()
                 return Response(OrderSerializer(order).data)
