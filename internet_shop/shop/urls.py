@@ -19,5 +19,5 @@ urlpatterns = [
     path("cart/", include(cart_router.urls)),
     path("orders/", include(order_router.urls)),
     path("registration/", include(registration_router.urls)),
-    path("balance/", include(user_balance_router.urls))
+    path("balance/", include(user_balance_router.urls)),
 ]

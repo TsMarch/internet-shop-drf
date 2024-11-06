@@ -1,5 +1,4 @@
 from decimal import Decimal
-
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import action
@@ -15,7 +14,8 @@ from .serializers import (
     ProductListSerializer,
     ProductSerializer,
     UserRegistrationSerializer,
-    UserBalanceSerializer, CartItemSerializer
+    UserBalanceSerializer,
+    CartItemSerializer, OrderItemSerializer,
 )
 
 
@@ -37,11 +37,11 @@ class UserBalanceViewSet(ModelViewSet):
         if cur_balance - amount * -1 < 0:
             raise ValueError
 
-    @action(detail=False, methods=['PATCH'])
+    @action(detail=False, methods=["PATCH"])
     def change_balance(self, request, *args, **kwargs):
         user_balance = self.get_queryset()
-        amount = Decimal(request.data.get('amount'))
-        if str(amount)[0] == '-':
+        amount = Decimal(request.data.get("amount"))
+        if str(amount)[0] == "-":
             try:
                 self.check_balance(user_balance.balance, amount)
             except ValueError:
@@ -73,8 +73,8 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
     @action(methods=["PATCH"], detail=False)
     def update_quantity(self, request, *args, **kwargs):
         products = self.queryset
-        new_quantity = request.data.get('available_quantity')
-        product_id = request.data.get('id')
+        new_quantity = request.data.get("available_quantity")
+        product_id = request.data.get("id")
         if product_id:
             product = products.get(id=product_id)
             product.available_quantity = new_quantity
@@ -124,11 +124,6 @@ class CartViewSet(ModelViewSet):
         serializer = CartSerializer(cart)
         return Response(serializer.data)
 
-    def find_cart(self, product_id: str):
-        cart = self.get_queryset()
-        product = get_object_or_404(Product, pk=product_id)
-        return cart, product
-
     @staticmethod
     def validate_quantity(requested_quantity: int, cart, product, **kwargs):
         cart_item = CartItems.objects.get(cart=cart, product=product)
@@ -151,7 +146,8 @@ class CartViewSet(ModelViewSet):
 
     @action(detail=False, methods=["POST", "PATCH", "DELETE"])
     def item(self, request):
-        cart, product = self.find_cart(product_id=request.data.get("product_id"))
+        cart = self.get_queryset()
+        product = get_object_or_404(Product, pk=request.data.get("product_id"))
         requested_quantity = int(request.data.get("quantity"))
         match request.method:
             case "POST":
@@ -198,15 +194,23 @@ class OrderViewSet(ModelViewSet):
     @action(detail=False, methods=["GET", "PATCH", "DELETE"])
     def order(self, request):
         cart_items = CartItems.objects.filter(cart__user=self.request.user)
-        user_balance = UserBalance.objects.get(user=self.request.user)
+        user_balance = UserBalance.objects.get(user=self.request.user).balance
+        total_sum = 0
         match request.method:
             case "GET":
                 order = Order.objects.create(user=self.request.user)
                 order_items = []
                 for item in cart_items:
-                    order_items.append(OrderItems(order=order, price=item.price, product_id=item.product_id, quantity=item.quantity))
+                    total_sum += item.quantity * item.price
+                    order_items.append(
+                        OrderItems(order=order, price=item.price, product_id=item.product_id, quantity=item.quantity)
+                    )
+                match user_balance >= total_sum:
+                    case True:
+                        pass
+
                 OrderItems.objects.bulk_create(order_items)
-                #cart_items.delete()
+                # cart_items.delete()
                 return Response(OrderSerializer(order).data)
 
             case "PATCH":
