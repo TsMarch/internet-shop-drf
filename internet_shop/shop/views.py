@@ -15,7 +15,8 @@ from .serializers import (
     ProductSerializer,
     UserRegistrationSerializer,
     UserBalanceSerializer,
-    CartItemSerializer, OrderItemSerializer,
+    CartItemSerializer,
+    OrderItemSerializer,
 )
 
 
@@ -45,7 +46,7 @@ class UserBalanceViewSet(ModelViewSet):
             try:
                 self.check_balance(user_balance.balance, amount)
             except ValueError:
-                return Response({"error": "not enough money for transaction"}, status=status.HTTP_400_BAD_REQUEST)
+                                        return Response({"error": "not enough money for transaction"}, status=status.HTTP_400_BAD_REQUEST)
         user_balance.balance += amount
         user_balance.save()
         serializer = self.get_serializer(user_balance)
