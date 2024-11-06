@@ -1,4 +1,5 @@
 from decimal import Decimal
+
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import action
@@ -13,10 +14,8 @@ from .serializers import (
     OrderSerializer,
     ProductListSerializer,
     ProductSerializer,
-    UserRegistrationSerializer,
     UserBalanceSerializer,
-    CartItemSerializer,
-    OrderItemSerializer,
+    UserRegistrationSerializer,
 )
 
 
@@ -46,7 +45,7 @@ class UserBalanceViewSet(ModelViewSet):
             try:
                 self.check_balance(user_balance.balance, amount)
             except ValueError:
-                                        return Response({"error": "not enough money for transaction"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "not enough money for transaction"}, status=status.HTTP_400_BAD_REQUEST)
         user_balance.balance += amount
         user_balance.save()
         serializer = self.get_serializer(user_balance)
