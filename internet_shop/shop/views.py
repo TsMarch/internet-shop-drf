@@ -70,24 +70,29 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         "retrieve": ProductSerializer,
     }
 
+    @staticmethod
+    def quantity_validator(data: dict):
+        products = ProductViewSet.queryset.filter(id__in=[i for i in data])
+        for i in products:
+            i.available_quantity = data[str(i.id)]
+        Product.objects.bulk_update(products, ["available_quantity"])
+        return Response(ProductSerializer(products, many=True).data, status=status.HTTP_200_OK)
+
     @action(methods=["PATCH"], detail=False)
-    def update_quantity(self, request, *args, **kwargs):
-        products = self.queryset
-        new_quantity = request.data.get("available_quantity")
-        product_id = request.data.get("id")
-        if product_id:
-            product = products.get(id=product_id)
-            product.available_quantity = new_quantity
-            product.save()
-            serializer = self.get_serializer(products.filter(id=product_id), many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response({"error": "no product id in request body"}, status=status.HTTP_404_NOT_FOUND)
+    def change_quantity(self, request, *args, **kwargs):
+        """
+        На вход принимается структура данных вида: {id_товара: количество товара}
+        """
+        try:
+            return self.quantity_validator(data=request.data)
+        except ValueError:
+            return Response({"error": "quantity must be integer"}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=["GET"], detail=False)
     def search(self, request):
         products = self.queryset
-        category_id = request.query_params.get("category_id", None)
-        name = request.query_params.get("name", None)
+        category_id = request.query_params.get("category_id")
+        name = request.query_params.get("name")
         if category_id:
             products = products.filter(category_id=category_id)
         if name:
