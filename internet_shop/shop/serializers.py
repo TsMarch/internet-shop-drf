@@ -3,7 +3,15 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Cart, CartItems, Order, OrderItems, Product, UserBalance
+from .models import (
+    Cart,
+    CartItems,
+    Order,
+    OrderItems,
+    Product,
+    UserBalance,
+    UserBalanceHistory,
+)
 
 User = get_user_model()
 
@@ -103,4 +111,10 @@ class OrderSerializer(serializers.ModelSerializer):
 class UserBalanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserBalance
+        fields = "__all__"
+
+
+class UserBalanceHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserBalanceHistory
         fields = "__all__"

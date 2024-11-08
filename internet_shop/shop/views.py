@@ -8,12 +8,22 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from .mixins import ModelViewMixin
-from .models import Cart, CartItems, Order, OrderItems, Product, User, UserBalance
+from .models import (
+    Cart,
+    CartItems,
+    Order,
+    OrderItems,
+    Product,
+    User,
+    UserBalance,
+    UserBalanceHistory,
+)
 from .serializers import (
     CartSerializer,
     OrderSerializer,
     ProductListSerializer,
     ProductSerializer,
+    UserBalanceHistorySerializer,
     UserBalanceSerializer,
     UserRegistrationSerializer,
 )
@@ -32,12 +42,26 @@ class UserBalanceViewSet(ModelViewSet):
         serializer = UserBalanceSerializer(user_balance)
         return Response(serializer.data)
 
+    @staticmethod
+    def balance_history(user_id, operation_type, amount):
+        match operation_type:
+            case "deposit":
+                UserBalanceHistory.objects.create(user=user_id, operation_type=operation_type, amount=amount)
+            case "payment":
+                UserBalanceHistory.objects.create(user=user_id, operation_type=operation_type, amount=amount)
+
+    @action(detail=False, methods=["GET"])
+    def check_balance_history(self, request):
+        balance_history = UserBalanceHistory.objects.filter(user=self.request.user)
+        return Response(UserBalanceHistorySerializer(balance_history, many=True).data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=["PATCH"])
     def add_funds(self, request, *args, **kwargs):
         user_balance = self.get_queryset()
         amount = Decimal(request.data.get("amount"))
         user_balance.balance += amount
         user_balance.save()
+        self.balance_history(self.request.user, "deposit", amount)
         serializer = self.get_serializer(user_balance)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -216,10 +240,10 @@ class OrderViewSet(ModelViewSet):
 
     @action(detail=False, methods=["GET", "PATCH", "DELETE"])
     def order(self, request):
-        cart_items = CartItems.objects.filter(cart__user=self.request.user)
-        user_balance = UserBalance.objects.get(user=self.request.user)
         match request.method:
             case "GET":
+                cart_items = CartItems.objects.filter(cart__user=self.request.user)
+                user_balance = UserBalance.objects.get(user=self.request.user)
                 order = Order.objects.create(user=self.request.user)
                 try:
                     order_items, order_sum, updated_products = ProductViewSet.product_balance(order, cart_items)
@@ -232,7 +256,7 @@ class OrderViewSet(ModelViewSet):
                         user_balance.save()
                     case False:
                         return Response({"error": "not enough money"}, status=status.HTTP_400_BAD_REQUEST)
-
+                UserBalanceViewSet.balance_history(self.request.user, "payment", order_sum)
                 OrderItems.objects.bulk_create(order_items)
                 cart_items.delete()
                 return Response(OrderSerializer(order).data)
