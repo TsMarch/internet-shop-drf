@@ -32,20 +32,10 @@ class UserBalanceViewSet(ModelViewSet):
         serializer = UserBalanceSerializer(user_balance)
         return Response(serializer.data)
 
-    @staticmethod
-    def check_balance(cur_balance, amount):
-        if cur_balance - amount * -1 < 0:
-            raise ValueError
-
     @action(detail=False, methods=["PATCH"])
-    def change_balance(self, request, *args, **kwargs):
+    def add_funds(self, request, *args, **kwargs):
         user_balance = self.get_queryset()
         amount = Decimal(request.data.get("amount"))
-        if str(amount)[0] == "-":
-            try:
-                self.check_balance(user_balance.balance, amount)
-            except ValueError:
-                return Response({"error": "not enough money for transaction"}, status=status.HTTP_400_BAD_REQUEST)
         user_balance.balance += amount
         user_balance.save()
         serializer = self.get_serializer(user_balance)
@@ -71,22 +61,50 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
     }
 
     @staticmethod
-    def quantity_validator(data: dict):
-        products = ProductViewSet.queryset.filter(id__in=[i for i in data])
-        for i in products:
-            i.available_quantity = data[str(i.id)]
-        Product.objects.bulk_update(products, ["available_quantity"])
-        return Response(ProductSerializer(products, many=True).data, status=status.HTTP_200_OK)
+    def product_balance(order, order_data: dict) -> tuple[list[OrderItems], int, list] | Response:
+        products = ProductViewSet.queryset.filter(id__in=[i.product_id for i in order_data])
+        updated_products = []
+        order_sum = 0
+        order_items = []
+        for product, order_item in zip(products, order_data):
+            if product.available_quantity == 0:
+                continue
+            match product.available_quantity >= order_item.quantity:
+                case True:
+                    product.available_quantity -= order_item.quantity
+                    updated_products.append(product)
+                    order_sum += order_item.quantity * product.price
+                case False:
+                    order_item.quantity = product.available_quantity
+                    product.available_quantity = 0
+                    updated_products.append(product)
+                    order_sum += order_item.quantity * product.price
+            order_items.append(
+                OrderItems(
+                    order=order,
+                    price=Decimal(order_item.price),
+                    product_id=order_item.product_id,
+                    quantity=order_item.quantity,
+                )
+            )
+        if updated_products:
+            return order_items, order_sum, updated_products
+        else:
+            raise ValueError
 
     @action(methods=["PATCH"], detail=False)
-    def change_quantity(self, request, *args, **kwargs):
+    def update_quantity(self, request, *args, **kwargs):
         """
         На вход принимается структура данных вида: {id_товара: количество товара}
         """
+        products = ProductViewSet.queryset.filter(id__in=request.data.keys())
+        for product in products:
+            product.available_quantity = request.data[str(product.id)]
         try:
-            return self.quantity_validator(data=request.data)
+            Product.objects.bulk_update(products, ["available_quantity"])
         except ValueError:
-            return Response({"error": "quantity must be integer"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        return Response(ProductSerializer(products, many=True).data, status=status.HTTP_200_OK)
 
     @action(methods=["GET"], detail=False)
     def search(self, request):
@@ -199,23 +217,24 @@ class OrderViewSet(ModelViewSet):
     @action(detail=False, methods=["GET", "PATCH", "DELETE"])
     def order(self, request):
         cart_items = CartItems.objects.filter(cart__user=self.request.user)
-        user_balance = UserBalance.objects.get(user=self.request.user).balance
-        total_sum = 0
+        user_balance = UserBalance.objects.get(user=self.request.user)
         match request.method:
             case "GET":
                 order = Order.objects.create(user=self.request.user)
-                order_items = []
-                for item in cart_items:
-                    total_sum += item.quantity * item.price
-                    order_items.append(
-                        OrderItems(order=order, price=item.price, product_id=item.product_id, quantity=item.quantity)
-                    )
-                match user_balance >= total_sum:
+                try:
+                    order_items, order_sum, updated_products = ProductViewSet.product_balance(order, cart_items)
+                except ValueError:
+                    return Response(status=status.HTTP_400_BAD_REQUEST)
+                match user_balance.balance >= order_sum:
                     case True:
-                        pass
+                        user_balance.balance -= order_sum
+                        Product.objects.bulk_update(updated_products, ["available_quantity"])
+                        user_balance.save()
+                    case False:
+                        return Response({"error": "not enough money"}, status=status.HTTP_400_BAD_REQUEST)
 
                 OrderItems.objects.bulk_create(order_items)
-                # cart_items.delete()
+                cart_items.delete()
                 return Response(OrderSerializer(order).data)
 
             case "PATCH":
