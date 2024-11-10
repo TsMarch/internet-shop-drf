@@ -27,7 +27,7 @@ from .serializers import (
     UserBalanceSerializer,
     UserRegistrationSerializer,
 )
-from .services import OrderService, UserBalanceService
+from .services import CartItemsService, OrderService, UserBalanceService
 
 
 class UserBalanceViewSet(ModelViewSet):
@@ -132,26 +132,6 @@ class CartViewSet(ModelViewSet):
         serializer = CartSerializer(cart)
         return Response(serializer.data)
 
-    @staticmethod
-    def validate_quantity(requested_quantity: int, cart, product, **kwargs):
-        cart_item = CartItems.objects.get(cart=cart, product=product)
-
-        match requested_quantity:
-            case requested_quantity if requested_quantity < 0:
-                return Response({"error": "Invalid quantity"}, status=status.HTTP_400_BAD_REQUEST)
-
-            case _:
-                cart_item.price = product.price
-                cart_item.save()
-                if cart_item.quantity > product.available_quantity:
-                    cart_item.quantity = product.available_quantity
-                    cart_item.save()
-                else:
-                    cart_item.quantity = requested_quantity
-                    cart_item.save()
-
-        return Response(CartSerializer(cart).data, status=status.HTTP_200_OK)
-
     @action(detail=False, methods=["POST", "PATCH", "DELETE"])
     def item(self, request):
         cart = self.get_queryset()
@@ -160,25 +140,25 @@ class CartViewSet(ModelViewSet):
         match request.method:
             case "POST":
                 try:
-                    return self.validate_quantity(
+                    validated_cart = CartItemsService.validate_quantity(
                         requested_quantity=requested_quantity,
                         cart=cart,
-                        product=product,
+                        product_id=product.id,
                     )
-                except CartItems.DoesNotExist:
-                    CartItems.objects.create(cart=cart, product=product, quantity=1)
-                    return self.validate_quantity(
-                        requested_quantity=requested_quantity,
-                        cart=cart,
-                        product=product,
-                    )
+                    return Response(CartSerializer(validated_cart).data, status=status.HTTP_200_OK)
+                except ValueError:
+                    return Response({"error": "not enough product"}, status=status.HTTP_400_BAD_REQUEST)
 
             case "PATCH":
-                return self.validate_quantity(
-                    requested_quantity=request.data.get("quantity"),
-                    cart=cart,
-                    product=product,
-                )
+                try:
+                    validated_cart = CartItemsService.validate_quantity(
+                        requested_quantity=requested_quantity,
+                        cart=cart,
+                        product_id=product.id,
+                    )
+                    return Response(CartSerializer(validated_cart).data, status=status.HTTP_200_OK)
+                except ValueError:
+                    return Response({"error": "not enough product"}, status=status.HTTP_400_BAD_REQUEST)
 
             case "DELETE":
                 try:
@@ -212,7 +192,7 @@ class OrderViewSet(ModelViewSet):
                 return Response(OrderSerializer(order, many=True).data)
 
             case "DELETE":
-                orders = Order.objects.filter(user=self.request.user)
+                orders = self.get_queryset()
                 for order in orders:
                     order.delete()
                 return Response({"status": "deleted orders successfully"}, status=status.HTTP_200_OK)

@@ -3,6 +3,7 @@ from decimal import Decimal
 from rest_framework.exceptions import ValidationError
 
 from .models import (
+    Cart,
     CartItems,
     Order,
     OrderItems,
@@ -20,7 +21,24 @@ class UserBalanceService:
         UserBalanceHistory.objects.create(user=user_id, operation_type=operation_type, amount=amount)
 
 
-class ProductService:
+class CartItemsService:
+
+    @staticmethod
+    def validate_quantity(requested_quantity: int, cart: Cart, product_id: int):
+        cart_item = CartItems.objects.get(cart=cart, product=product_id)
+        product = Product.objects.get(pk=product_id)
+        if product.available_quantity == 0:
+            raise ValueError("not enough product")
+        cart_item.quantity = min(product.available_quantity, requested_quantity)
+        cart_item.price = product.price
+        cart_item.save()
+        return cart
+
+
+class OrderService:
+    def __init__(self, user):
+        self.user = user
+
     @staticmethod
     def product_balance(order, order_data: list[CartItems]) -> tuple[list[OrderItems], int, list]:
         products = Product.objects.filter(id__in=[product.product_id for product in order_data])
@@ -47,29 +65,22 @@ class ProductService:
         else:
             raise ValueError
 
-
-class OrderService:
-    def __init__(self, user):
-        self.user = user
-
     def create_order(self):
         cart_items = CartItems.objects.filter(cart__user=self.user)
         user_balance = UserBalance.objects.get(user=self.user)
         order = Order.objects.create(user=self.user)
         try:
-            order_items, order_sum, updated_products = ProductService.product_balance(order, cart_items)
+            order_items, order_sum, updated_products = self.product_balance(order, cart_items)
         except ValueError:
             raise ValidationError("no items were updated")
-        match user_balance.balance >= order_sum:
-            case True:
-                user_balance.balance -= order_sum
-                Product.objects.bulk_update(updated_products, ["available_quantity"])
-                user_balance.save()
-                UserBalanceService.create_balance_history(
-                    self.user, UserBalanceHistory.OperationType.PAYMENT, order_sum
-                )
-                OrderItems.objects.bulk_create(order_items)
-                cart_items.delete()
-                return order
-            case False:
-                raise ValidationError("not enough money")
+
+        if user_balance.balance >= order_sum:
+            user_balance.balance -= order_sum
+            Product.objects.bulk_update(updated_products, ["available_quantity"])
+            user_balance.save()
+            OrderItems.objects.bulk_create(order_items)
+            cart_items.delete()
+            UserBalanceService.create_balance_history(self.user, UserBalanceHistory.OperationType.PAYMENT, order_sum)
+            return order
+
+        raise ValidationError("not enough money")
