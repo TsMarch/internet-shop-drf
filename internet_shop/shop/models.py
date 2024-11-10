@@ -95,7 +95,11 @@ class UserBalance(models.Model):
 
 
 class UserBalanceHistory(models.Model):
+    class OperationType(models.TextChoices):
+        DEPOSIT = "deposit"
+        PAYMENT = "payment"
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    operation_type = models.CharField("Тип операции", max_length=20, blank=False)
+    operation_type = models.CharField("Тип операции", max_length=7, blank=False, choices=OperationType)
     amount = models.DecimalField("Сумма операции", decimal_places=6, max_digits=20, null=False)
     created_at = models.DateTimeField(auto_now_add=True)
