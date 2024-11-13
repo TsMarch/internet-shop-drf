@@ -73,6 +73,7 @@ class Order(models.Model):
     active_flag = models.BooleanField(blank=True, default=True)
     delivery_flag = models.BooleanField(blank=True, default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    total_sum = models.DecimalField("Сумма заказа", decimal_places=6, max_digits=20, null=True)
 
 
 class OrderItems(models.Model):
