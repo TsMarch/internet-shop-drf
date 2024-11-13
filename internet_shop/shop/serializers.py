@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
@@ -44,23 +42,13 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
 class ProductListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
-        fields = ["id", "name", "price", "old_price", "available_quantity"]
+        fields = "__all__"
 
 
 class ProductSerializer(DynamicFieldsModelSerializer):
     class Meta:
         model = Product
         fields = "__all__"
-
-    def create(self, validated_data):
-        old_price = validated_data.get("old_price")
-        discount = validated_data.get("discount")
-        match all([old_price is not None, discount is not None]):
-            case True:
-                validated_data["price"] = Decimal(old_price - old_price * discount / 100)
-            case _:
-                validated_data["price"] = None
-        return super().create(validated_data)
 
 
 class CartItemSerializer(serializers.ModelSerializer):

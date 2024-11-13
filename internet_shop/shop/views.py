@@ -27,7 +27,13 @@ from .serializers import (
     UserBalanceSerializer,
     UserRegistrationSerializer,
 )
-from .services import CartItemsService, DepositProcessor, OrderService, PaymentProcessor
+from .services import (
+    CartItemsService,
+    DepositProcessor,
+    OrderService,
+    PaymentProcessor,
+    ProductService,
+)
 
 
 class UserBalanceViewSet(ModelViewSet):
@@ -79,18 +85,21 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
     }
 
     @action(methods=["PATCH"], detail=False)
-    def update_quantity(self, request, *args, **kwargs):
+    def update_field(self, request, *args, **kwargs):
         """
-        На вход принимается структура данных вида: {id_товара: количество товара}
+        На вход принимается структура данных вида: {product_id: id, name: название поля product, value: value}
         """
-        products = ProductViewSet.queryset.filter(id__in=request.data.keys())
-        for product in products:
-            product.available_quantity = request.data[str(product.id)]
-        try:
-            Product.objects.bulk_update(products, ["available_quantity"])
-        except ValueError:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        return Response(ProductSerializer(products, many=True).data, status=status.HTTP_200_OK)
+        product_service = ProductService(
+            product_id=request.data.get("product_id"), field=request.data.get("field_name")
+        )
+        updated_product = product_service.update_field(request.data.get("field_value"))
+        return Response(ProductSerializer(updated_product).data, status=status.HTTP_200_OK)
+
+    @action(methods=["GET"], detail=False)
+    def update_price(self, request):
+        for product in self.queryset:
+            product.price = Decimal(product.old_price - (product.discount * product.old_price) / 100)
+        return Response(self.get_serializer(self.queryset, many=True).data, status=status.HTTP_200_OK)
 
     @action(methods=["GET"], detail=False)
     def search(self, request):

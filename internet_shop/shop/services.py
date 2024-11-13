@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from decimal import Decimal
+from typing import Literal
 
 from rest_framework.exceptions import ValidationError
 
@@ -34,21 +35,24 @@ class DepositProcessor(UserBalanceProcessorInterface):
         )
 
 
-class ProductService(ABC):
-    @abstractmethod
-    def validate_quantity(self):
-        pass
+class ProductService:
+    def __init__(
+        self,
+        product_id: int,
+        field: Literal[
+            "category", "name", "description", "old_price", "discount", "price", "available", "available_quantity"
+        ],
+    ):
+        self.product = Product.objects.get(id=product_id)
+        self.field = field
+
+    def update_field(self, field_value: int | str):
+        setattr(self.product, self.field, field_value)
+        self.product.save()
+        return self.product
 
 
-class CartProductService(ProductService):
-    def __init__(self, products_id: list[int]):
-        self.product = Product.objects.filter(id__in=products_id)
-
-    def validate_quantity(self):
-        pass
-
-
-class OrderProductService(ProductService):
+class OrderItemsService:
     def __init__(self, order_data: list[CartItems], order: Order):
         self.products = Product.objects.filter(id__in=[product.product_id for product in order_data])
         self.order_data = order_data
@@ -82,10 +86,6 @@ class OrderProductService(ProductService):
 
 
 class CartItemsService:
-    def __init__(self, cart: Cart, product_id: int):
-        self.cart = cart
-        self.product_id = product_id
-
     @staticmethod
     def validate_quantity(requested_quantity: int, cart: Cart, product_id: int):
         print(cart, product_id)
@@ -105,7 +105,7 @@ class OrderService:
         self.payment_processor = payment_processor
         self.cart_items = CartItems.objects.filter(cart__user=user)
         self.order = Order.objects.create(user=self.user)
-        self.products_processor = OrderProductService(self.cart_items, order=self.order)
+        self.products_processor = OrderItemsService(self.cart_items, order=self.order)
 
     def create_order(self):
         user_balance = UserBalance.objects.get(user=self.user)
@@ -120,7 +120,7 @@ class OrderService:
             user_balance.save()
             OrderItems.objects.bulk_create(order_items)
             self.cart_items.delete()
-            self.order.total_sum = order_sum
+            self.order.total_sum = Decimal(order_sum)
             self.order.save()
             self.payment_processor.create_balance_history(self.user, order_sum)
             return self.order
