@@ -27,7 +27,7 @@ from .serializers import (
     UserBalanceSerializer,
     UserRegistrationSerializer,
 )
-from .services import CartItemsService, OrderService, UserBalanceService
+from .services import CartItemsService, DepositProcessor, OrderService, PaymentProcessor
 
 
 class UserBalanceViewSet(ModelViewSet):
@@ -54,7 +54,8 @@ class UserBalanceViewSet(ModelViewSet):
         amount = Decimal(request.data.get("amount"))
         user_balance.balance += amount
         user_balance.save()
-        UserBalanceService.create_balance_history(self.request.user, UserBalanceHistory.OperationType.DEPOSIT, amount)
+        deposit_processor = DepositProcessor()
+        deposit_processor.create_balance_history(self.request.user, amount)
         serializer = self.get_serializer(user_balance)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -148,6 +149,14 @@ class CartViewSet(ModelViewSet):
                     return Response(CartSerializer(validated_cart).data, status=status.HTTP_200_OK)
                 except ValueError:
                     return Response({"error": "not enough product"}, status=status.HTTP_400_BAD_REQUEST)
+                except CartItems.DoesNotExist:
+                    CartItems.objects.create(cart=cart, product=product, quantity=1)
+                    validated_cart = CartItemsService.validate_quantity(
+                        requested_quantity=requested_quantity,
+                        cart=cart,
+                        product_id=product.id,
+                    )
+                    return Response(CartSerializer(validated_cart).data, status=status.HTTP_200_OK)
 
             case "PATCH":
                 try:
@@ -180,7 +189,8 @@ class OrderViewSet(ModelViewSet):
         match request.method:
             case "GET":
                 try:
-                    order_service = OrderService(self.request.user)
+                    payment_processor = PaymentProcessor()
+                    order_service = OrderService(self.request.user, payment_processor)
                     order = order_service.create_order()
                     return Response(OrderSerializer(order).data)
                 except ValidationError as e:

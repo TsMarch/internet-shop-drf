@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from decimal import Decimal
 
 from rest_framework.exceptions import ValidationError
@@ -13,18 +14,34 @@ from .models import (
 )
 
 
-class UserBalanceService:
-    @staticmethod
-    def create_balance_history(user_id, operation_type, amount):
-        if operation_type not in [UserBalanceHistory.OperationType.DEPOSIT, UserBalanceHistory.OperationType.PAYMENT]:
-            raise ValidationError("Неверный тип операции")
-        UserBalanceHistory.objects.create(user=user_id, operation_type=operation_type, amount=amount)
+class UserBalanceProcessorInterface(ABC):
+    @abstractmethod
+    def create_balance_history(self, user_id, amount):
+        pass
+
+
+class PaymentProcessor(UserBalanceProcessorInterface):
+    def create_balance_history(self, user_id, amount):
+        UserBalanceHistory.objects.create(
+            user=user_id, operation_type=UserBalanceHistory.OperationType.PAYMENT, amount=amount
+        )
+
+
+class DepositProcessor(UserBalanceProcessorInterface):
+    def create_balance_history(self, user_id, amount):
+        UserBalanceHistory.objects.create(
+            user=user_id, operation_type=UserBalanceHistory.OperationType.DEPOSIT, amount=amount
+        )
 
 
 class CartItemsService:
+    def __init__(self, cart: Cart, product_id: int):
+        self.cart = cart
+        self.product_id = product_id
 
     @staticmethod
     def validate_quantity(requested_quantity: int, cart: Cart, product_id: int):
+        print(cart, product_id)
         cart_item = CartItems.objects.get(cart=cart, product=product_id)
         product = Product.objects.get(pk=product_id)
         if product.available_quantity == 0:
@@ -36,8 +53,9 @@ class CartItemsService:
 
 
 class OrderService:
-    def __init__(self, user):
+    def __init__(self, user, payment_processor: UserBalanceProcessorInterface):
         self.user = user
+        self.payment_processor = payment_processor
 
     @staticmethod
     def product_balance(order, order_data: list[CartItems]) -> tuple[list[OrderItems], int, list]:
@@ -80,7 +98,7 @@ class OrderService:
             user_balance.save()
             OrderItems.objects.bulk_create(order_items)
             cart_items.delete()
-            UserBalanceService.create_balance_history(self.user, UserBalanceHistory.OperationType.PAYMENT, order_sum)
+            self.payment_processor.create_balance_history(self.user, order_sum)
             return order
 
         raise ValidationError("not enough money")
