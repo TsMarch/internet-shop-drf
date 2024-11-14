@@ -46,26 +46,49 @@ class ProductService:
         self.product = Product.objects.get(id=product_id)
         self.field = field
 
-    def update_field(self, field_value: int | str):
+    def update_field(self, field_value: int | str) -> Product:
         setattr(self.product, self.field, field_value)
         self.product.save()
         return self.product
 
 
-class OrderItemsService:
+class OrderItemsService(ABC):
+    @abstractmethod
+    def validate_quantity(self):
+        pass
+
+
+class ExternalOrderItemsService(OrderItemsService):
+    def __init__(self, order_data: list[CartItems]):
+        self.products = Product.objects.filter(id__in=[product.product_id for product in order_data])
+        self.order_data = order_data
+
+    def validate_quantity(self) -> list[Product]:
+        updated_products = []
+        for product, order_item in zip(self.products, self.order_data):
+            if product.available_quantity == 0:
+                continue
+            order_item.quantity = min(product.available_quantity, order_item.quantity)
+            product.available_quantity -= order_item.quantity
+            updated_products.append(product)
+        Product.objects.bulk_update(updated_products, ["available_quantity"])
+        return updated_products
+
+
+class InternalOrderItemsService(OrderItemsService):
     def __init__(self, order_data: list[CartItems], order: Order):
         self.products = Product.objects.filter(id__in=[product.product_id for product in order_data])
         self.order_data = order_data
         self.order = order
 
     @staticmethod
-    def count_total_sum(order_items):
+    def count_total_sum(order_items) -> Decimal:
         total_sum = 0
         for item in order_items:
             total_sum += item.quantity * item.price
-        return total_sum
+        return Decimal(total_sum)
 
-    def validate_quantity(self):
+    def validate_quantity(self) -> tuple[list[OrderItems], list[Product]]:
         updated_products = []
         order_items = []
         for product, order_item in zip(self.products, self.order_data):
@@ -105,9 +128,9 @@ class OrderService:
         self.payment_processor = payment_processor
         self.cart_items = CartItems.objects.filter(cart__user=user)
         self.order = Order.objects.create(user=self.user)
-        self.products_processor = OrderItemsService(self.cart_items, order=self.order)
+        self.products_processor = InternalOrderItemsService(self.cart_items, order=self.order)
 
-    def create_order(self):
+    def create_order(self) -> Order | ValidationError:
         user_balance = UserBalance.objects.get(user=self.user)
         if not self.cart_items:
             raise ValidationError("empty cart")

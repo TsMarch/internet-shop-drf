@@ -30,10 +30,27 @@ from .serializers import (
 from .services import (
     CartItemsService,
     DepositProcessor,
+    ExternalOrderItemsService,
     OrderService,
     PaymentProcessor,
     ProductService,
 )
+
+
+class ExternalOrderViewSet(ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderSerializer
+
+    @action(detail=False, methods=["GET"])
+    def order(self, request):
+        match request.method:
+            case "GET":
+                try:
+                    order_service = ExternalOrderItemsService(request.data.get("order_data"))
+                    order_service.validate_quantity()
+                    return Response({"status: successfully reduced product stock"}, status=status.HTTP_200_OK)
+                except ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserBalanceViewSet(ModelViewSet):
