@@ -40,12 +40,16 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
 
 
 class ProductListSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+
     class Meta:
         model = Product
         fields = "__all__"
 
 
 class ProductSerializer(DynamicFieldsModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+
     class Meta:
         model = Product
         fields = "__all__"
