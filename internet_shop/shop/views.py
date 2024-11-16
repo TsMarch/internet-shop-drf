@@ -41,7 +41,7 @@ class ExternalOrderViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = OrderSerializer
 
-    @action(detail=False, methods=["GET"])
+    @action(detail=True, methods=["GET"])
     def order(self, request):
         match request.method:
             case "GET":
@@ -71,7 +71,7 @@ class UserBalanceViewSet(ModelViewSet):
         balance_history = UserBalanceHistory.objects.filter(user=self.request.user)
         return Response(UserBalanceHistorySerializer(balance_history, many=True).data, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["PATCH"])
+    @action(detail=True, methods=["PATCH"])
     def add_funds(self, request, *args, **kwargs):
         user_balance = self.get_queryset()
         amount = Decimal(request.data.get("amount"))
@@ -101,7 +101,7 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         "retrieve": ProductSerializer,
     }
 
-    @action(methods=["PATCH"], detail=False)
+    @action(methods=["PATCH"], detail=True)
     def update_field(self, request, *args, **kwargs):
         """
         На вход принимается структура данных вида: {product_id: id, name: название поля product, value: value}
@@ -118,7 +118,7 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
             product.price = Decimal(product.old_price - (product.discount * product.old_price) / 100)
         return Response(self.get_serializer(self.queryset, many=True).data, status=status.HTTP_200_OK)
 
-    @action(methods=["GET"], detail=False)
+    @action(methods=["GET"], detail=True)
     def search(self, request):
         products = self.queryset
         category_id = request.query_params.get("category_id")
@@ -137,7 +137,7 @@ class CartViewSet(ModelViewSet):
     serializer_class = CartSerializer
 
     def get_queryset(self):
-        user_cart, _ = Cart.objects.get_or_create(user=1)
+        user_cart, _ = Cart.objects.get_or_create(user=self.request.user)
         return user_cart
 
     def list(self, request, *args, **kwargs):
@@ -159,7 +159,7 @@ class CartViewSet(ModelViewSet):
         serializer = CartSerializer(cart)
         return Response(serializer.data)
 
-    @action(detail=False, methods=["POST", "PATCH", "DELETE"])
+    @action(detail=True, methods=["POST", "PATCH", "DELETE"])
     def item(self, request):
         cart = self.get_queryset()
         product = get_object_or_404(Product, pk=request.data.get("product_id"))
@@ -210,7 +210,7 @@ class OrderViewSet(ModelViewSet):
     def get_queryset(self, **kwargs):
         return Order.objects.filter(user=self.request.user)
 
-    @action(detail=False, methods=["GET", "PATCH", "DELETE"])
+    @action(detail=True, methods=["GET", "PATCH", "DELETE"])
     def order(self, request):
         match request.method:
             case "GET":

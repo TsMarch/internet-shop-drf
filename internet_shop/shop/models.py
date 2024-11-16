@@ -3,6 +3,22 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 
+class ProductAttributeName(models.Model):
+    name = models.CharField(max_length=100)
+    is_boolean = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.name
+
+
+class ProductAttributeValue(models.Model):
+    attribute = models.ForeignKey(ProductAttributeName, related_name="attribute_name", on_delete=models.CASCADE)
+    value = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.value
+
+
 class ProductCategory(models.Model):
     name = models.CharField("Название категории", max_length=100)
 
@@ -11,31 +27,6 @@ class ProductCategory(models.Model):
 
     def __str__(self):
         return f"{self.name}"
-
-
-class ProductAttributeGroup(models.Model):
-    name = models.CharField(max_length=100)
-    category = models.ForeignKey(ProductCategory, on_delete=models.CASCADE)
-
-    def __str__(self):
-        return self.name
-
-
-class ProductAttribute(models.Model):
-    name = models.CharField(max_length=100)
-    group = models.ForeignKey(ProductAttributeGroup, related_name="attributes", on_delete=models.CASCADE)
-    is_boolean = models.BooleanField(default=False)
-
-    def __str__(self):
-        return self.name
-
-
-class AttributeValue(models.Model):
-    attribute = models.ForeignKey(ProductAttribute, related_name="values", on_delete=models.CASCADE)
-    value = models.CharField(max_length=255)
-
-    def __str__(self):
-        return self.value
 
 
 class Product(models.Model):
@@ -55,6 +46,7 @@ class Product(models.Model):
     )
     available = models.BooleanField("Доступность товара", default=True)
     available_quantity = models.PositiveIntegerField("Остаток товара на складе", default=0)
+    attributes = models.ManyToManyField(ProductAttributeValue, related_name="attributes", through="AttrValueMapper")
 
     class Meta:
         verbose_name_plural = "Товары"
@@ -66,6 +58,11 @@ class Product(models.Model):
         if not self.available and self.available_quantity > 0:
             raise ValidationError("Невозможно наличие товара на складе если он недоступен")
         super().save()
+
+
+class AttrValueMapper(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    attribute = models.ForeignKey(ProductAttributeValue, on_delete=models.CASCADE)
 
 
 class Cart(models.Model):
