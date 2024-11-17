@@ -39,13 +39,9 @@ class ProductAttributeValueSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        representation_merged_dict = {}
-        for i in representation:
-            if i == "attribute_name":
-                representation_merged_dict[representation[i]] = None
-                bufer = representation[i]
-            if i == "value":
-                representation_merged_dict[bufer] = representation[i]
+        representation_merged_dict = {
+            representation.get("attribute_name"): representation.get("value") for i in representation
+        }
         return representation_merged_dict
 
 
