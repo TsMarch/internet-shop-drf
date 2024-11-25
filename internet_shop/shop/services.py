@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Literal
 
+from eav.models import Attribute, Value
 from rest_framework.exceptions import ValidationError
 
 from .models import (
@@ -13,6 +14,52 @@ from .models import (
     UserBalance,
     UserBalanceHistory,
 )
+
+DATATYPE_MAP = {
+    "int": Attribute.TYPE_INT,
+    "float": Attribute.TYPE_FLOAT,
+    "text": Attribute.TYPE_TEXT,
+    "date": Attribute.TYPE_DATE,
+    "bool": Attribute.TYPE_BOOLEAN,
+    "object": Attribute.TYPE_OBJECT,
+    "enum": Attribute.TYPE_ENUM,
+    "json": Attribute.TYPE_JSON,
+    "csv": Attribute.TYPE_CSV,
+}
+
+
+class AttributeInterface(ABC):
+    @abstractmethod
+    def get_or_create_attribute(
+        self, datatype=Literal["int", "float", "text", "date", "bool", "object", "enum", "json", "csv"]
+    ):
+        pass
+
+
+class ProductAttributeService:
+    def __init__(self, product_id, attribute: AttributeInterface):
+        self.product = Product.objects.get(id=product_id)
+        self.attribute = attribute
+
+    def attach_attribute(self, attribute_value, datatype):
+        setattr(self.product.eav, self.attribute.get_or_create_attribute(datatype=datatype), attribute_value)
+        self.product.save()
+        return self.product
+
+
+class AttributeService(AttributeInterface):
+    def __init__(self, attribute_name):
+        self.attribute_name = attribute_name
+
+    def get_or_create_attribute(
+        self, datatype=Literal["int", "float", "text", "date", "bool", "object", "enum", "json", "csv"]
+    ):
+        Attribute.objects.get_or_create(name=self.attribute_name, datatype=DATATYPE_MAP[datatype])
+        return self.attribute_name
+
+    def delete_attribute(self, product_id):
+        product_attr = Value.objects.filter(entity_id=product_id, attribute__name=self.attribute_name)
+        product_attr.delete()
 
 
 class UserBalanceProcessorInterface(ABC):

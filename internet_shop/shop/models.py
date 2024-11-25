@@ -1,3 +1,4 @@
+import eav
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -58,6 +59,9 @@ class Product(models.Model):
         if not self.available and self.available_quantity > 0:
             raise ValidationError("Невозможно наличие товара на складе если он недоступен")
         super().save()
+
+
+eav.register(Product)
 
 
 class AttrValueMapper(models.Model):

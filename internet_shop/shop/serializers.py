@@ -37,13 +37,6 @@ class ProductAttributeValueSerializer(serializers.ModelSerializer):
         model = ProductAttributeValue
         fields = ["attribute_name", "value"]
 
-    def to_representation(self, instance):
-        representation = super().to_representation(instance)
-        representation_merged_dict = {
-            representation.get("attribute_name"): representation.get("value") for i in representation
-        }
-        return representation_merged_dict
-
 
 class CategorySerializer(serializers.ModelSerializer):
 
@@ -67,7 +60,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 class ProductListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
-    attribute_value = ProductAttributeValueSerializer(many=True)
+    # attributes = ProductAttributeValueSerializer(many=True)
 
     class Meta:
         model = Product
@@ -76,7 +69,7 @@ class ProductListSerializer(serializers.ModelSerializer):
 
 class ProductSerializer(DynamicFieldsModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
-    attributes = ProductAttributeValueSerializer(many=True)
+    # attributes = ProductAttributeValueSerializer(many=True)
 
     class Meta:
         model = Product

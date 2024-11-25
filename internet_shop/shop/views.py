@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -28,13 +28,22 @@ from .serializers import (
     UserRegistrationSerializer,
 )
 from .services import (
+    AttributeService,
     CartItemsService,
     DepositProcessor,
     ExternalOrderItemsService,
     OrderService,
     PaymentProcessor,
+    ProductAttributeService,
     ProductService,
 )
+
+
+@api_view(["POST"])
+def delete_attribute(request):
+    attribute = AttributeService(attribute_name=request.data.get("attribute_name"))
+    attribute.delete_attribute(product_id=request.data.get("product_id"))
+    return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
 
 
 class ExternalOrderViewSet(ModelViewSet):
@@ -100,6 +109,17 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         "create": ProductSerializer,
         "retrieve": ProductSerializer,
     }
+
+    @action(methods=["POST"], detail=False)
+    def attach_attribute(self, request):
+        attribute = AttributeService(attribute_name=request.data.get("attribute_name"))
+        product = ProductAttributeService(product_id=request.data.get("product_id"), attribute=attribute)
+        product = product.attach_attribute(
+            attribute_value=request.data.get("attribute_value"), datatype=request.data.get("datatype")
+        )
+        for i in product.eav:
+            print(i)
+        return Response(ProductSerializer(product).data, status=status.HTTP_200_OK)
 
     @action(methods=["PATCH"], detail=False)
     def update_field(self, request, *args, **kwargs):
