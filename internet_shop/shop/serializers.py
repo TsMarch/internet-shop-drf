@@ -60,7 +60,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 class ProductListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
-    # attributes = ProductAttributeValueSerializer(many=True)
+    attributes = serializers.DictField(source="eav.get_values_dict", read_only=True)
 
     class Meta:
         model = Product
@@ -69,7 +69,7 @@ class ProductListSerializer(serializers.ModelSerializer):
 
 class ProductSerializer(DynamicFieldsModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
-    # attributes = ProductAttributeValueSerializer(many=True)
+    attributes = serializers.DictField(source="eav.get_values_dict", read_only=True)
 
     class Meta:
         model = Product

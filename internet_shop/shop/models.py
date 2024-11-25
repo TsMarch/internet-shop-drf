@@ -47,7 +47,7 @@ class Product(models.Model):
     )
     available = models.BooleanField("Доступность товара", default=True)
     available_quantity = models.PositiveIntegerField("Остаток товара на складе", default=0)
-    attributes = models.ManyToManyField(ProductAttributeValue, related_name="attributes", through="AttrValueMapper")
+    # attributes = models.ManyToManyField(ProductAttributeValue, related_name="attributes", through="AttrValueMapper")
 
     class Meta:
         verbose_name_plural = "Товары"
