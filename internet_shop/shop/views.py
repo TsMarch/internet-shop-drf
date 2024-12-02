@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -28,12 +28,38 @@ from .serializers import (
     UserRegistrationSerializer,
 )
 from .services import (
+    AttributeService,
     CartItemsService,
     DepositProcessor,
+    ExternalOrderItemsService,
     OrderService,
     PaymentProcessor,
+    ProductAttributeService,
     ProductService,
 )
+
+
+@api_view(["POST"])
+def delete_attribute(request):
+    attribute = AttributeService(attribute_name=request.data.get("attribute_name"))
+    attribute.delete_attribute(product_id=request.data.get("product_id"))
+    return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
+
+
+class ExternalOrderViewSet(ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderSerializer
+
+    @action(detail=False, methods=["GET"])
+    def order(self, request):
+        match request.method:
+            case "GET":
+                try:
+                    order_service = ExternalOrderItemsService(request.data.get("order_data"))
+                    order_service.validate_quantity()
+                    return Response({"status: successfully reduced product stock"}, status=status.HTTP_200_OK)
+                except ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserBalanceViewSet(ModelViewSet):
@@ -84,6 +110,17 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         "retrieve": ProductSerializer,
     }
 
+    @action(methods=["POST"], detail=False)
+    def attach_attribute(self, request):
+        attribute = AttributeService(attribute_name=request.data.get("attribute_name"))
+        product = ProductAttributeService(product_id=request.data.get("product_id"), attribute=attribute)
+        product = product.attach_attribute(
+            attribute_value=request.data.get("attribute_value"), datatype=request.data.get("datatype")
+        )
+        for i in product.eav:
+            print(i)
+        return Response(ProductSerializer(product).data, status=status.HTTP_200_OK)
+
     @action(methods=["PATCH"], detail=False)
     def update_field(self, request, *args, **kwargs):
         """
@@ -120,7 +157,7 @@ class CartViewSet(ModelViewSet):
     serializer_class = CartSerializer
 
     def get_queryset(self):
-        user_cart, _ = Cart.objects.get_or_create(user=1)
+        user_cart, _ = Cart.objects.get_or_create(user=self.request.user)
         return user_cart
 
     def list(self, request, *args, **kwargs):
@@ -201,7 +238,7 @@ class OrderViewSet(ModelViewSet):
                     payment_processor = PaymentProcessor()
                     order_service = OrderService(self.request.user, payment_processor)
                     order = order_service.create_order()
-                    return Response(OrderSerializer(order).data)
+                    return Response(self.serializer_class(order).data)
                 except ValidationError as e:
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

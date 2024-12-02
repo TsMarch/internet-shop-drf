@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
@@ -7,11 +9,40 @@ from .models import (
     Order,
     OrderItems,
     Product,
+    ProductAttributeValue,
+    ProductCategory,
     UserBalance,
     UserBalanceHistory,
 )
 
 User = get_user_model()
+
+
+class DynamicFieldsModelSerializer(serializers.ModelSerializer):
+    def __init__(self, *args, **kwargs):
+        fields = kwargs.pop("fields", None)
+        super().__init__(*args, **kwargs)
+
+        if fields is not None:
+            allowed = set(fields)
+            existing = set(self.fields)
+            for field_name in existing - allowed:
+                self.fields.pop(field_name)
+
+
+class ProductAttributeValueSerializer(serializers.ModelSerializer):
+    attribute_name = serializers.CharField(source="attribute.name")
+
+    class Meta:
+        model = ProductAttributeValue
+        fields = ["attribute_name", "value"]
+
+
+class CategorySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ProductCategory
+        fields = "__all__"
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -27,28 +58,32 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
-class DynamicFieldsModelSerializer(serializers.ModelSerializer):
-    def __init__(self, *args, **kwargs):
-        fields = kwargs.pop("fields", None)
-        super().__init__(*args, **kwargs)
-
-        if fields is not None:
-            allowed = set(fields)
-            existing = set(self.fields)
-            for field_name in existing - allowed:
-                self.fields.pop(field_name)
-
-
 class ProductListSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+    attributes = serializers.DictField(source="eav.get_values_dict", read_only=True)
+
     class Meta:
         model = Product
         fields = "__all__"
 
 
 class ProductSerializer(DynamicFieldsModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+    attributes = serializers.DictField(source="eav.get_values_dict", read_only=True)
+
     class Meta:
         model = Product
         fields = "__all__"
+
+    def create(self, validated_data):
+        old_price = validated_data.get("old_price")
+        discount = validated_data.get("discount")
+        match all([old_price is not None, discount is not None]):
+            case True:
+                validated_data["price"] = Decimal(old_price - old_price * discount / 100)
+            case _:
+                validated_data["price"] = None
+        return super().create(validated_data)
 
 
 class CartItemSerializer(serializers.ModelSerializer):
