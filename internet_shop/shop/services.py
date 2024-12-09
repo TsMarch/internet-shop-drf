@@ -1,7 +1,9 @@
+import time
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Literal
 
+from django.db import transaction
 from eav.models import Attribute, Value
 from rest_framework.exceptions import ValidationError
 
@@ -178,21 +180,25 @@ class OrderService:
         self.products_processor = InternalOrderItemsService(self.cart_items, order=self.order)
 
     def create_order(self) -> Order | ValidationError:
-        user_balance = UserBalance.objects.get(user=self.user)
         if not self.cart_items:
             raise ValidationError("empty cart")
-        order_items, updated_products = self.products_processor.validate_quantity()
-        order_sum = self.products_processor.count_total_sum(order_items)
 
-        if user_balance.balance >= order_sum:
-            user_balance.balance -= order_sum
-            Product.objects.bulk_update(updated_products, ["available_quantity"])
-            user_balance.save()
-            OrderItems.objects.bulk_create(order_items)
-            self.cart_items.delete()
-            self.order.total_sum = Decimal(order_sum)
-            self.order.save()
-            self.payment_processor.create_balance_history(self.user, order_sum)
-            return self.order
+        with transaction.atomic():
+            user_balance = UserBalance.objects.select_for_update().get(user=self.user)
+            product_ids = [i.product_id for i in self.cart_items]
+            Product.objects.select_for_update().filter(id__in=product_ids)
+            order_items, updated_products = self.products_processor.validate_quantity()
+            order_sum = self.products_processor.count_total_sum(order_items)
+            time.sleep(5)
+            if user_balance.balance >= order_sum:
+                user_balance.balance -= order_sum
+                Product.objects.bulk_update(updated_products, ["available_quantity"])
+                user_balance.save()
+                OrderItems.objects.bulk_create(order_items)
+                self.cart_items.delete()
+                self.order.total_sum = Decimal(order_sum)
+                self.order.save()
+                self.payment_processor.create_balance_history(self.user, order_sum)
+                return self.order
 
-        raise ValidationError("not enough money")
+            raise ValidationError("not enough money")
