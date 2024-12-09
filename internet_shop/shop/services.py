@@ -1,4 +1,3 @@
-import time
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Literal
@@ -189,7 +188,6 @@ class OrderService:
             Product.objects.select_for_update().filter(id__in=product_ids)
             order_items, updated_products = self.products_processor.validate_quantity()
             order_sum = self.products_processor.count_total_sum(order_items)
-            time.sleep(5)
             if user_balance.balance >= order_sum:
                 user_balance.balance -= order_sum
                 Product.objects.bulk_update(updated_products, ["available_quantity"])
