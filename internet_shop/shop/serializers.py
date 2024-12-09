@@ -124,11 +124,18 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Order
+        fields = ["created_at", "total_sum"]
+
+
+class OrderDetailSerializer(serializers.ModelSerializer):
     orderitems = OrderItemSerializer(many=True)
 
     class Meta:
         model = Order
-        fields = "__all__"
+        fields = ["created_at", "total_sum", "orderitems"]
 
 
 class UserBalanceSerializer(serializers.ModelSerializer):

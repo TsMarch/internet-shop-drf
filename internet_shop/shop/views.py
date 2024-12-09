@@ -20,6 +20,7 @@ from .models import (
 )
 from .serializers import (
     CartSerializer,
+    OrderDetailSerializer,
     OrderSerializer,
     ProductListSerializer,
     ProductSerializer,
@@ -223,9 +224,13 @@ class CartViewSet(ModelViewSet):
                     return Response(CartSerializer(cart).data, status=status.HTTP_204_NO_CONTENT)
 
 
-class OrderViewSet(ModelViewSet):
+class OrderViewSet(ModelViewSet, ModelViewMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = OrderSerializer
+    serializer_action_classes = {
+        "list": OrderSerializer,
+        "retrieve": OrderDetailSerializer,
+    }
 
     def get_queryset(self, **kwargs):
         return Order.objects.filter(user=self.request.user)
