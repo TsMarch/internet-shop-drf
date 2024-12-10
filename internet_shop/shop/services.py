@@ -184,8 +184,7 @@ class OrderService:
 
         with transaction.atomic():
             user_balance = UserBalance.objects.select_for_update().get(user=self.user)
-            product_ids = [i.product_id for i in self.cart_items]
-            Product.objects.select_for_update().filter(id__in=product_ids)
+            Product.objects.select_for_update().filter(cartitems__cart__user=self.user)
             order_items, updated_products = self.products_processor.validate_quantity()
             order_sum = self.products_processor.count_total_sum(order_items)
             if user_balance.balance >= order_sum:
