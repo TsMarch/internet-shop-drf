@@ -70,6 +70,8 @@ mccabe = "0.7.0"
 pycodestyle = "2.12.1"
 pyflakes = "3.2.0"
 django-eav2 = "^1.7.1"
+psycopg2-binary = "^2.9.10"
+python-dotenv = "^1.0.1"
 
 [tool.black]
 line-length = 120

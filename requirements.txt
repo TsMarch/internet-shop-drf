@@ -42,12 +42,14 @@ poetry==1.8.4
 poetry-core==1.9.1
 poetry-plugin-export==1.8.0
 pre_commit==4.0.1
+psycopg2-binary==2.9.10
 ptyprocess==0.7.0
 pycodestyle==2.12.1
 pycparser==2.22
 pyflakes==3.2.0
 PyJWT==2.9.0
 pyproject_hooks==1.2.0
+python-dotenv==1.0.1
 pywin32-ctypes==0.2.3
 PyYAML==6.0.2
 RapidFuzz==3.10.0

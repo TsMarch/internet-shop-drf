@@ -174,28 +174,29 @@ class OrderService:
     def __init__(self, user, payment_processor: UserBalanceProcessorInterface):
         self.user = user
         self.payment_processor = payment_processor
-        self.cart_items = CartItems.objects.filter(cart__user=user)
         self.order = Order.objects.create(user=self.user)
-        self.products_processor = InternalOrderItemsService(self.cart_items, order=self.order)
 
+    @transaction.atomic
     def create_order(self) -> Order | ValidationError:
-        if not self.cart_items:
+        cart_items = CartItems.objects.select_for_update().filter(cart__user=self.user)
+
+        if not cart_items:
             raise ValidationError("empty cart")
 
-        with transaction.atomic():
-            user_balance = UserBalance.objects.select_for_update().get(user=self.user)
-            Product.objects.select_for_update().filter(cartitems__cart__user=self.user)
-            order_items, updated_products = self.products_processor.validate_quantity()
-            order_sum = self.products_processor.count_total_sum(order_items)
-            if user_balance.balance >= order_sum:
-                user_balance.balance -= order_sum
-                Product.objects.bulk_update(updated_products, ["available_quantity"])
-                user_balance.save()
-                OrderItems.objects.bulk_create(order_items)
-                self.cart_items.delete()
-                self.order.total_sum = Decimal(order_sum)
-                self.order.save()
-                self.payment_processor.create_balance_history(self.user, order_sum)
-                return self.order
+        products_processor = InternalOrderItemsService(cart_items, order=self.order)
+        user_balance = UserBalance.objects.select_for_update().get(user=self.user)
+        Product.objects.select_for_update().filter(cartitems__cart__user=self.user)
+        order_items, updated_products = products_processor.validate_quantity()
+        order_sum = products_processor.count_total_sum(order_items)
+        if user_balance.balance >= order_sum:
+            user_balance.balance -= order_sum
+            Product.objects.bulk_update(updated_products, ["available_quantity"])
+            user_balance.save()
+            OrderItems.objects.bulk_create(order_items)
+            cart_items.delete()
+            self.order.total_sum = Decimal(order_sum)
+            self.order.save()
+            self.payment_processor.create_balance_history(self.user, order_sum)
+            return self.order
 
-            raise ValidationError("not enough money")
+        raise ValidationError("not enough money")

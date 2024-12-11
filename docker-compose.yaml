@@ -1,0 +1,16 @@
+version: '3.7'
+services:
+  postgres:
+    image: postgres
+    container_name: shop
+    environment:
+      POSTGRES_USER: $(DATABASE_USER)
+      POSTGRES_PASSWORD: $(DATABASE_PASSWORD)
+      POSTGRES_DB: $(DATABASE_NAME)
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

@@ -9,7 +9,6 @@ from .models import (
     Order,
     OrderItems,
     Product,
-    ProductAttributeValue,
     ProductCategory,
     UserBalance,
     UserBalanceHistory,
@@ -28,14 +27,6 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
             existing = set(self.fields)
             for field_name in existing - allowed:
                 self.fields.pop(field_name)
-
-
-class ProductAttributeValueSerializer(serializers.ModelSerializer):
-    attribute_name = serializers.CharField(source="attribute.name")
-
-    class Meta:
-        model = ProductAttributeValue
-        fields = ["attribute_name", "value"]
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -142,6 +133,9 @@ class UserBalanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserBalance
         fields = "__all__"
+
+    def create(self, validated_data):
+        print(**validated_data)
 
 
 class UserBalanceHistorySerializer(serializers.ModelSerializer):

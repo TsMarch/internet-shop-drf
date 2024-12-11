@@ -14,12 +14,14 @@ from .models import (
     CartItems,
     Order,
     Product,
+    ProductCategory,
     User,
     UserBalance,
     UserBalanceHistory,
 )
 from .serializers import (
     CartSerializer,
+    CategorySerializer,
     OrderDetailSerializer,
     OrderSerializer,
     ProductListSerializer,
@@ -100,6 +102,11 @@ class UserRegistrationViewSet(ModelViewSet):
         "list": UserRegistrationSerializer,
         "create": UserRegistrationSerializer,
     }
+
+
+class ProductCategoryViewSet(ModelViewSet):
+    queryset = ProductCategory.objects.all()
+    serializer_class = CategorySerializer
 
 
 class ProductViewSet(ModelViewMixin, ModelViewSet):
