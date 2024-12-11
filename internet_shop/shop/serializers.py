@@ -134,9 +134,6 @@ class UserBalanceSerializer(serializers.ModelSerializer):
         model = UserBalance
         fields = "__all__"
 
-    def create(self, validated_data):
-        print(**validated_data)
-
 
 class UserBalanceHistorySerializer(serializers.ModelSerializer):
     class Meta:
