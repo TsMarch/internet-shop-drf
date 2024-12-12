@@ -48,7 +48,7 @@ class AttributeService:
     def resolve_attributes(self):
         existing_attributes = Attribute.objects.filter(name__in=self.attributes.keys()).values_list("name", flat=True)
         attributes_to_create = [
-            Attribute(name=name, datatype=data[1], slug=name)
+            Attribute(name=name, datatype=DATATYPE_MAP[data[1]], slug=name)
             for name, data in self.attributes.items()
             if name not in existing_attributes
         ]
