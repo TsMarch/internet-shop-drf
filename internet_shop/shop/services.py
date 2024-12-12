@@ -29,37 +29,37 @@ DATATYPE_MAP = {
 }
 
 
-class AttributeInterface(ABC):
-    @abstractmethod
-    def get_or_create_attribute(
-        self, datatype=Literal["int", "float", "text", "date", "bool", "object", "enum", "json", "csv"]
-    ):
-        pass
-
-
 class ProductAttributeService:
-    def __init__(self, product_id, attribute: AttributeInterface):
+    def __init__(self, product_id, attributes):
         self.product = Product.objects.get(id=product_id)
-        self.attribute = attribute
+        self.attributes = attributes
 
-    def attach_attribute(self, attribute_value, datatype):
-        setattr(self.product.eav, self.attribute.get_or_create_attribute(datatype=datatype), attribute_value)
+    def attach_attribute(self):
+        for attr in self.attributes:
+            setattr(self.product.eav, attr, self.attributes[attr][0])
         self.product.save()
         return self.product
 
 
-class AttributeService(AttributeInterface):
-    def __init__(self, attribute_name):
-        self.attribute_name = attribute_name
+class AttributeService:
+    def __init__(self, attributes: list):
+        self.attributes = {attr["attribute_name"]: (attr["attribute_value"], attr["datatype"]) for attr in attributes}
 
-    def get_or_create_attribute(
-        self, datatype=Literal["int", "float", "text", "date", "bool", "object", "enum", "json", "csv"]
-    ):
-        Attribute.objects.get_or_create(name=self.attribute_name, datatype=DATATYPE_MAP[datatype])
-        return self.attribute_name
+    def resolve_attributes(self):
+        existing_attributes = Attribute.objects.filter(name__in=self.attributes.keys()).values_list("name", flat=True)
+        attributes_to_create = [
+            Attribute(name=name, datatype=data[1], slug=name)
+            for name, data in self.attributes.items()
+            if name not in existing_attributes
+        ]
+        if attributes_to_create:
+            Attribute.objects.bulk_create(attributes_to_create)
 
-    def delete_attribute(self, product_id):
-        product_attr = Value.objects.filter(entity_id=product_id, attribute__name=self.attribute_name)
+        return self.attributes
+
+    @staticmethod
+    def delete_attribute(product_id, attribute_name):
+        product_attr = Value.objects.filter(entity_id=product_id, attribute__name=attribute_name)
         product_attr.delete()
 
 

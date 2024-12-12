@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -44,8 +45,9 @@ from .services import (
 
 @api_view(["POST"])
 def delete_attribute(request):
-    attribute = AttributeService(attribute_name=request.data.get("attribute_name"))
-    attribute.delete_attribute(product_id=request.data.get("product_id"))
+    AttributeService.delete_attribute(
+        product_id=request.data.get("product_id"), attribute_name=request.data.get("attribute_name")
+    )
     return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
 
 
@@ -118,16 +120,27 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         "retrieve": ProductSerializer,
     }
 
+    @staticmethod
+    def attrs_handler(attrs, product_id):
+        attrs = AttributeService(attributes=attrs).resolve_attributes()
+        product = ProductAttributeService(product_id=product_id, attributes=attrs)
+        product = product.attach_attribute()
+        return product
+
     @action(methods=["POST"], detail=False)
     def attach_attribute(self, request):
-        attribute = AttributeService(attribute_name=request.data.get("attribute_name"))
-        product = ProductAttributeService(product_id=request.data.get("product_id"), attribute=attribute)
-        product = product.attach_attribute(
-            attribute_value=request.data.get("attribute_value"), datatype=request.data.get("datatype")
-        )
-        for i in product.eav:
-            print(i)
+        attrs = json.loads(request.data.get("attributes", []))
+        product = ProductViewSet.attrs_handler(attrs, request.data.get("product_id"))
         return Response(ProductSerializer(product).data, status=status.HTTP_200_OK)
+
+    @action(methods=["POST"], detail=False)
+    def create_with_attributes(self, request):
+        create_product = self.serializer_action_classes["create"](data=request.data)
+        create_product.is_valid(raise_exception=True)
+        product = create_product.save()
+        attrs = json.loads(request.data.get("attributes", []))
+        product = ProductViewSet.attrs_handler(attrs, product.id)
+        return Response(self.serializer_class(product).data, status=status.HTTP_200_OK)
 
     @action(methods=["PATCH"], detail=False)
     def update_field(self, request, *args, **kwargs):
