@@ -1,12 +1,15 @@
 import json
 
-from django.db.models import Q
+from django.db.models import Field, Q
 from rest_framework.filters import BaseFilterBackend
 
+from .models import Product
 
-class ProductEAVFilter(BaseFilterBackend):
+
+class ProductFilter(BaseFilterBackend):
     def filter_queryset(self, request, queryset, view):
         eav_filters = request.query_params.get("filters")
+
         if not eav_filters:
             return queryset
 
@@ -14,24 +17,42 @@ class ProductEAVFilter(BaseFilterBackend):
             filters = json.loads(eav_filters)
         except ValueError:
             return queryset
+        fields = [field.name for field in Product._meta.get_fields() if isinstance(field, Field)]
+        query = Q()
 
-        eav_query = Q()
         for attr_name, filter_data in filters.items():
             data_type = filter_data.get("type")
             value = filter_data.get("value")
 
-            if data_type == "text":
-                gte = value.get("gte")
-                lte = value.get("lte")
-                if gte is not None:
-                    eav_query &= Q(**{f"{attr_name}__gte": gte})
-                if lte is not None:
-                    eav_query &= Q(**{f"{attr_name}__lte": lte})
+            match data_type:
+                case "text" | "enum":
+                    if attr_name in fields:
+                        query &= Q(**{f"{attr_name}__in": value})
+                    else:
+                        query &= Q(**{f"eav__{attr_name}__in": value})
 
-        # elif data_type == "text":
-        #    eav_query &= Q(**{f"eav__{attr_name}__in": value})
+                case "number":
+                    gte = float(value["gte"]) if value.get("gte") is not None else None
+                    lte = float(value["lte"]) if value.get("lte") is not None else None
+                    prefix = attr_name if attr_name in fields else f"eav__{attr_name}"
+                    filters = {}
+                    match (gte, lte):
+                        case (None, None):
+                            pass
+                        case (float(), float()):
+                            if gte > lte:
+                                raise ValueError("Invalid range: 'gte' cannot be greater than 'lte'")
+                            else:
+                                filters[f"{prefix}__gte"] = gte
+                                filters[f"{prefix}__lte"] = lte
+                        case (float(), None):
+                            filters[f"{prefix}__gte"] = gte
+                        case (None, float()):
+                            filters[f"{prefix}__lte"] = lte
+                        case _:
+                            raise ValueError("Invalid values for 'gte' or 'lte'")
 
-        # elif data_type == "enum":
-        #   eav_query &= Q(**{f"eav__{attr_name}__in": value})
+                    if filters:
+                        query &= Q(**filters)
 
-        return queryset.filter(eav_query)
+        return queryset.filter(query)

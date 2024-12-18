@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from .filters import ProductEAVFilter
+from .filters import ProductFilter
 from .mixins import ModelViewMixin
 from .models import (
     Cart,
@@ -116,7 +116,7 @@ class ProductCategoryViewSet(ModelViewSet):
 class ProductViewSet(ModelViewMixin, ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    filter_backends = [ProductEAVFilter, DjangoFilterBackend]
+    filter_backends = [ProductFilter, DjangoFilterBackend]
     serializer_action_classes = {
         "list": ProductListSerializer,
         "create": ProductSerializer,
