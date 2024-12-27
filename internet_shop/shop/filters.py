@@ -32,6 +32,7 @@ class ProductFilter(BaseFilterBackend):
                         query &= Q(**{f"eav__{attr_name}__in": value})
 
                 case "number":
+
                     gte = float(value["gte"]) if value.get("gte") is not None else None
                     lte = float(value["lte"]) if value.get("lte") is not None else None
                     prefix = attr_name if attr_name in fields else f"eav__{attr_name}"
@@ -56,3 +57,8 @@ class ProductFilter(BaseFilterBackend):
                         query &= Q(**filters)
 
         return queryset.filter(query)
+
+    def _validate_gte_and_lte(self, attr_name, value: dict):
+        # gte = float(value["gte"]) if value.get("gte") is not None else None
+        # lte = float(value["lte"]) if value.get("lte") is not None else None
+        pass

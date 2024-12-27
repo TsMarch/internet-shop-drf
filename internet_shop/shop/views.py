@@ -133,7 +133,7 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
     @action(methods=["POST"], detail=False)
     def attach_attribute(self, request):
         attrs = json.loads(request.data.get("attributes", []))
-        product = ProductViewSet.attrs_handler(attrs, request.data.get("product_id"))
+        product = self.attrs_handler(attrs, request.data.get("product_id"))
         return Response(ProductSerializer(product).data, status=status.HTTP_200_OK)
 
     @action(methods=["POST"], detail=False)
@@ -142,7 +142,7 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         create_product.is_valid(raise_exception=True)
         product = create_product.save()
         attrs = json.loads(request.data.get("attributes", []))
-        product = ProductViewSet.attrs_handler(attrs, product.id)
+        product = self.attrs_handler(attrs, product.id)
         return Response(self.serializer_class(product).data, status=status.HTTP_200_OK)
 
     @action(methods=["PATCH"], detail=False)

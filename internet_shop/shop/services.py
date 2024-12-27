@@ -59,8 +59,7 @@ class AttributeService:
 
     @staticmethod
     def delete_attribute(product_id, attribute_name):
-        product_attr = Value.objects.filter(entity_id=product_id, attribute__name=attribute_name)
-        product_attr.delete()
+        Value.objects.filter(entity_id=product_id, attribute__name=attribute_name).delete()
 
 
 class UserBalanceProcessorInterface(ABC):
