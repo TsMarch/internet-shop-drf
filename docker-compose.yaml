@@ -4,9 +4,9 @@ services:
     image: postgres
     container_name: shop
     environment:
-      POSTGRES_USER: $(DATABASE_USER)
-      POSTGRES_PASSWORD: $(DATABASE_PASSWORD)
-      POSTGRES_DB: $(DATABASE_NAME)
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: shop
+      POSTGRES_DB: shop
     ports:
       - "5435:5432"
     volumes:
