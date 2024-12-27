@@ -36,29 +36,25 @@ class ProductFilter(BaseFilterBackend):
                     gte = float(value["gte"]) if value.get("gte") is not None else None
                     lte = float(value["lte"]) if value.get("lte") is not None else None
                     prefix = attr_name if attr_name in fields else f"eav__{attr_name}"
+                    self._validate_gte_and_lte(gte=gte, lte=lte)
                     filters = {}
-                    match (gte, lte):
-                        case (None, None):
-                            pass
-                        case (float(), float()):
-                            if gte > lte:
-                                raise ValueError("Invalid range: 'gte' cannot be greater than 'lte'")
-                            else:
-                                filters[f"{prefix}__gte"] = gte
-                                filters[f"{prefix}__lte"] = lte
-                        case (float(), None):
-                            filters[f"{prefix}__gte"] = gte
-                        case (None, float()):
-                            filters[f"{prefix}__lte"] = lte
-                        case _:
-                            raise ValueError("Invalid values for 'gte' or 'lte'")
+                    if gte is not None:
+                        filters[f"{prefix}__gte"] = gte
+                    if lte is not None:
+                        filters[f"{prefix}__lte"] = lte
 
                     if filters:
                         query &= Q(**filters)
+                    print(query)
 
         return queryset.filter(query)
 
-    def _validate_gte_and_lte(self, attr_name, value: dict):
-        # gte = float(value["gte"]) if value.get("gte") is not None else None
-        # lte = float(value["lte"]) if value.get("lte") is not None else None
-        pass
+    def _validate_gte_and_lte(self, **kwargs):
+        if kwargs["gte"] is not None and not isinstance(kwargs["gte"], (float, int)):
+            raise ValueError("'gte' must be a number or None")
+        if kwargs["lte"] is not None and not isinstance(kwargs["lte"], (float, int)):
+            raise ValueError("'lte' must be a number or None")
+        if kwargs["gte"] is not None and kwargs["lte"] is not None and kwargs["gte"] > kwargs["lte"]:
+            raise ValueError("Invalid range: 'gte' cannot be greater than 'lte'")
+
+        return kwargs
