@@ -47,6 +47,11 @@ class Product(models.Model):
 eav.register(Product)
 
 
+class ProductComment(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    review = models.TextField("Отзыв", blank=False)
+
+
 class Cart(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
 

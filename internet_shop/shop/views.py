@@ -18,6 +18,7 @@ from .models import (
     Order,
     Product,
     ProductCategory,
+    ProductComment,
     User,
     UserBalance,
     UserBalanceHistory,
@@ -27,6 +28,7 @@ from .serializers import (
     CategorySerializer,
     OrderDetailSerializer,
     OrderSerializer,
+    ProductCommentSerializer,
     ProductListSerializer,
     ProductSerializer,
     UserBalanceHistorySerializer,
@@ -51,6 +53,12 @@ def delete_attribute(request):
         product_id=request.data.get("product_id"), attribute_name=request.data.get("attribute_name")
     )
     return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
+
+
+class CreateProductComment(ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProductCommentSerializer
+    queryset = ProductComment.objects.all()
 
 
 class ExternalOrderViewSet(ModelViewSet):

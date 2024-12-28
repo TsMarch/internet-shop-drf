@@ -10,6 +10,7 @@ from .models import (
     OrderItems,
     Product,
     ProductCategory,
+    ProductComment,
     UserBalance,
     UserBalanceHistory,
 )
@@ -75,6 +76,12 @@ class ProductSerializer(DynamicFieldsModelSerializer):
             case _:
                 validated_data["price"] = None
         return super().create(validated_data)
+
+
+class ProductCommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductComment
+        fields = "__all__"
 
 
 class CartItemSerializer(serializers.ModelSerializer):
