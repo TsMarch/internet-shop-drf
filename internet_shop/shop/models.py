@@ -50,6 +50,21 @@ eav.register(Product)
 class ProductComment(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     review = models.TextField("Отзыв", blank=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+
+class ProductRating(models.Model):
+    class RatingChoices(models.IntegerChoices):
+        ONE = 1
+        TWO = 2
+        THREE = 3
+        FOUR = 4
+        FIVE = 5
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    review = models.ForeignKey(ProductComment, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    rating = models.IntegerField(choices=RatingChoices.choices, verbose_name="Rating")
 
 
 class Cart(models.Model):
