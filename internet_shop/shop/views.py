@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action, api_view
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -138,11 +139,11 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         product = product.attach_attribute()
         return product
 
-    @action(methods=["POST"], detail=False)
+    @action(methods=["POST"], detail=False, parser_classes=[MultiPartParser, FormParser])
     def upload_file(self, request):
-        file = request.FILE.get("file")
-        if file.name.endswith(".csv"):
-            pass
+        if str(request.FILES.get("file")).endswith(".csv"):
+            print("here is csv")
+        return Response(status=status.HTTP_200_OK)
 
     @action(methods=["POST"], detail=False)
     def attach_attribute(self, request):
