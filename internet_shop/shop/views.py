@@ -139,6 +139,12 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         return product
 
     @action(methods=["POST"], detail=False)
+    def upload_file(self, request):
+        file = request.FILE.get("file")
+        if file.name.endswith(".csv"):
+            pass
+
+    @action(methods=["POST"], detail=False)
     def attach_attribute(self, request):
         attrs = json.loads(request.data.get("attributes", []))
         product = self.attrs_handler(attrs, request.data.get("product_id"))
