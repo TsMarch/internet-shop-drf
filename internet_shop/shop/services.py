@@ -12,6 +12,7 @@ from .models import (
     Order,
     OrderItems,
     Product,
+    ProductCategory,
     UserBalance,
     UserBalanceHistory,
 )
@@ -80,6 +81,38 @@ class DepositProcessor(UserBalanceProcessorInterface):
         UserBalanceHistory.objects.create(
             user=user_id, operation_type=UserBalanceHistory.OperationType.DEPOSIT, amount=amount
         )
+
+
+class ProductFileService:
+    def __init__(self, data: list[dict]):
+        self.data = data
+
+    def prepare_products(self):
+        category_names = {product.get("category") for product in self.data}
+        categories = ProductCategory.objects.filter(name__in=category_names)
+        category_cache = {category.name: category for category in categories}
+        products = []
+
+        for product in self.data:
+            category = category_cache.get(product.get("category"))
+            old_price = product.get("price")
+            discount = product.get("discount")
+            if old_price is not None and discount is not None:
+                product["price"] = Decimal(old_price - old_price * discount / 100)
+            else:
+                product["price"] = None
+            products.append(
+                Product(
+                    name=product.get("name"),
+                    old_price=old_price,
+                    available_quantity=product.get("available_quantity"),
+                    category=category,
+                    description=product.get("description", "default"),
+                    discount=discount,
+                    price=product["price"],
+                )
+            )
+        return products
 
 
 class ProductService:

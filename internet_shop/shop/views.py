@@ -1,6 +1,7 @@
 import json
 from decimal import Decimal
 
+import pandas as pd
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -44,6 +45,7 @@ from .services import (
     OrderService,
     PaymentProcessor,
     ProductAttributeService,
+    ProductFileService,
     ProductService,
 )
 
@@ -141,9 +143,12 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
 
     @action(methods=["POST"], detail=False, parser_classes=[MultiPartParser, FormParser])
     def upload_file(self, request):
-        if str(request.FILES.get("file")).endswith(".csv"):
-            print("here is csv")
-        return Response(status=status.HTTP_200_OK)
+        file = request.FILES.get("file")
+        df = pd.read_excel(file)
+        products = ProductFileService(df.to_dict(orient="records"))
+        products = products.prepare_products()
+        Product.objects.bulk_create(products)
+        return Response("new products created", status=status.HTTP_200_OK)
 
     @action(methods=["POST"], detail=False)
     def attach_attribute(self, request):

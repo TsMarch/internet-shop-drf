@@ -5,7 +5,7 @@ from django.db import models
 
 
 class ProductCategory(models.Model):
-    name = models.CharField("Название категории", max_length=100)
+    name = models.CharField("Название категории", max_length=100, unique=True)
 
     class Meta:
         verbose_name_plural = "Категории товаров"
