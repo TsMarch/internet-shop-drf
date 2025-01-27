@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action, api_view
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -18,6 +19,8 @@ from .models import (
     Order,
     Product,
     ProductCategory,
+    ProductComment,
+    ProductRating,
     User,
     UserBalance,
     UserBalanceHistory,
@@ -27,7 +30,9 @@ from .serializers import (
     CategorySerializer,
     OrderDetailSerializer,
     OrderSerializer,
+    ProductCommentSerializer,
     ProductListSerializer,
+    ProductRatingSerializer,
     ProductSerializer,
     UserBalanceHistorySerializer,
     UserBalanceSerializer,
@@ -41,6 +46,7 @@ from .services import (
     OrderService,
     PaymentProcessor,
     ProductAttributeService,
+    ProductFileService,
     ProductService,
 )
 
@@ -51,6 +57,22 @@ def delete_attribute(request):
         product_id=request.data.get("product_id"), attribute_name=request.data.get("attribute_name")
     )
     return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
+
+
+class CreateProductRating(ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProductRatingSerializer
+    queryset = ProductRating.objects.all()
+
+
+class CreateProductComment(ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProductCommentSerializer
+    queryset = ProductComment.objects.all()
+
+    @action(methods=["POST"], detail=False)
+    def get_related_comments(self, request):
+        return Response("not ready", status=status.HTTP_400_BAD_REQUEST)
 
 
 class ExternalOrderViewSet(ModelViewSet):
@@ -129,6 +151,13 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         product = ProductAttributeService(product_id=product_id, attributes=attrs)
         product = product.attach_attribute()
         return product
+
+    @action(methods=["POST"], detail=False, parser_classes=[MultiPartParser, FormParser])
+    def upload_products_file(self, request):
+        file = request.FILES.get("file")
+        products = ProductFileService(file)
+        products.create_products()
+        return Response("new products created", status=status.HTTP_200_OK)
 
     @action(methods=["POST"], detail=False)
     def attach_attribute(self, request):

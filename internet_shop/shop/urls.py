@@ -3,6 +3,8 @@ from rest_framework import routers
 
 from .views import (
     CartViewSet,
+    CreateProductComment,
+    CreateProductRating,
     ExternalOrderViewSet,
     OrderViewSet,
     ProductCategoryViewSet,
@@ -26,6 +28,10 @@ user_balance_router = routers.DefaultRouter()
 user_balance_router.register(r"", UserBalanceViewSet, basename="balance")
 external_order_router = routers.DefaultRouter()
 external_order_router.register(r"", ExternalOrderViewSet, basename="external-orders")
+product_comment_router = routers.DefaultRouter()
+product_comment_router.register(r"", CreateProductComment, basename="product-comment")
+product_rating_router = routers.DefaultRouter()
+product_rating_router.register(r"", CreateProductRating, basename="product-rating")
 
 
 urlpatterns = [
@@ -37,4 +43,6 @@ urlpatterns = [
     path("balance/", include(user_balance_router.urls)),
     path("external/", include(external_order_router.urls)),
     path("delete_attribute/", delete_attribute),
+    path("product-comment/", include(product_comment_router.urls)),
+    path("product-rating/", include(product_rating_router.urls)),
 ]

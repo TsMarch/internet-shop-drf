@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Literal
 
+import pandas as pd
+from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 from eav.models import Attribute, Value
 from rest_framework.exceptions import ValidationError
@@ -12,6 +14,7 @@ from .models import (
     Order,
     OrderItems,
     Product,
+    ProductCategory,
     UserBalance,
     UserBalanceHistory,
 )
@@ -80,6 +83,38 @@ class DepositProcessor(UserBalanceProcessorInterface):
         UserBalanceHistory.objects.create(
             user=user_id, operation_type=UserBalanceHistory.OperationType.DEPOSIT, amount=amount
         )
+
+
+class ProductFileService:
+    def __init__(self, data: UploadedFile):
+        self.data = pd.read_excel(data).to_dict(orient="records")
+
+    def create_products(self):
+        category_names = {product.get("category") for product in self.data}
+        categories = ProductCategory.objects.filter(name__in=category_names)
+        category_cache = {category.name: category for category in categories}
+        products = []
+
+        for product in self.data:
+            category = category_cache.get(product.get("category"))
+            old_price = product.get("price")
+            discount = product.get("discount")
+            if old_price is not None and discount is not None:
+                product["price"] = Decimal(old_price - old_price * discount / 100)
+            else:
+                product["price"] = None
+            products.append(
+                Product(
+                    name=product.get("name"),
+                    old_price=old_price,
+                    available_quantity=product.get("available_quantity"),
+                    category=category,
+                    description=product.get("description", "default"),
+                    discount=discount,
+                    price=product["price"],
+                )
+            )
+        Product.objects.bulk_create(products)
 
 
 class ProductService:
