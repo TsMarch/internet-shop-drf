@@ -1,7 +1,6 @@
 import json
 from decimal import Decimal
 
-import pandas as pd
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -144,10 +143,8 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
     @action(methods=["POST"], detail=False, parser_classes=[MultiPartParser, FormParser])
     def upload_file(self, request):
         file = request.FILES.get("file")
-        df = pd.read_excel(file)
-        products = ProductFileService(df.to_dict(orient="records"))
-        products = products.prepare_products()
-        Product.objects.bulk_create(products)
+        products = ProductFileService(file)
+        products.create_products()
         return Response("new products created", status=status.HTTP_200_OK)
 
     @action(methods=["POST"], detail=False)

@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from decimal import Decimal
 from typing import Literal
 
+import pandas as pd
+from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 from eav.models import Attribute, Value
 from rest_framework.exceptions import ValidationError
@@ -84,10 +86,10 @@ class DepositProcessor(UserBalanceProcessorInterface):
 
 
 class ProductFileService:
-    def __init__(self, data: list[dict]):
-        self.data = data
+    def __init__(self, data: UploadedFile):
+        self.data = pd.read_excel(data).to_dict(orient="records")
 
-    def prepare_products(self):
+    def create_products(self):
         category_names = {product.get("category") for product in self.data}
         categories = ProductCategory.objects.filter(name__in=category_names)
         category_cache = {category.name: category for category in categories}
@@ -112,7 +114,7 @@ class ProductFileService:
                     price=product["price"],
                 )
             )
-        return products
+        Product.objects.bulk_create(products)
 
 
 class ProductService:
