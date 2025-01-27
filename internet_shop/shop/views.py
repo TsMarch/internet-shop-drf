@@ -20,6 +20,7 @@ from .models import (
     Product,
     ProductCategory,
     ProductComment,
+    ProductRating,
     User,
     UserBalance,
     UserBalanceHistory,
@@ -31,6 +32,7 @@ from .serializers import (
     OrderSerializer,
     ProductCommentSerializer,
     ProductListSerializer,
+    ProductRatingSerializer,
     ProductSerializer,
     UserBalanceHistorySerializer,
     UserBalanceSerializer,
@@ -57,10 +59,20 @@ def delete_attribute(request):
     return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
 
 
+class CreateProductRating(ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProductRatingSerializer
+    queryset = ProductRating.objects.all()
+
+
 class CreateProductComment(ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ProductCommentSerializer
     queryset = ProductComment.objects.all()
+
+    @action(methods=["POST"], detail=False)
+    def get_related_comments(self, request):
+        return Response("not ready", status=status.HTTP_400_BAD_REQUEST)
 
 
 class ExternalOrderViewSet(ModelViewSet):
@@ -141,7 +153,7 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         return product
 
     @action(methods=["POST"], detail=False, parser_classes=[MultiPartParser, FormParser])
-    def upload_file(self, request):
+    def upload_products_file(self, request):
         file = request.FILES.get("file")
         products = ProductFileService(file)
         products.create_products()

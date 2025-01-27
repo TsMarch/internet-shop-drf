@@ -49,8 +49,10 @@ eav.register(Product)
 
 class ProductComment(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    review = models.TextField("Отзыв", blank=False)
+    text = models.TextField("Отзыв", blank=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class ProductRating(models.Model):
@@ -62,9 +64,11 @@ class ProductRating(models.Model):
         FIVE = 5
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    review = models.ForeignKey(ProductComment, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     rating = models.IntegerField(choices=RatingChoices.choices, verbose_name="Rating")
+
+    class Meta:
+        unique_together = ("product", "user")
 
 
 class Cart(models.Model):
