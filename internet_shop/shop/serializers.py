@@ -71,6 +71,7 @@ class ProductListSerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(ProductListSerializer, DynamicFieldsModelSerializer):
+    comments = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -85,6 +86,10 @@ class ProductSerializer(ProductListSerializer, DynamicFieldsModelSerializer):
             case _:
                 validated_data["price"] = None
         return super().create(validated_data)
+
+    def get_comments(self, obj):
+        comments = ProductComment.objects.filter(product=obj)
+        return ProductCommentSerializer(comments, many=True).data
 
 
 class ProductRatingSerializer(serializers.ModelSerializer):
