@@ -6,10 +6,11 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action, api_view
+from rest_framework.mixins import RetrieveModelMixin
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ModelViewSet, ViewSet
 
 from .filters import ProductFilter
 from .mixins import ModelViewMixin
@@ -91,18 +92,12 @@ class ExternalOrderViewSet(ModelViewSet):
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserBalanceViewSet(ModelViewSet):
-    serializer_class = UserBalanceSerializer
+class UserBalanceViewSet(RetrieveModelMixin, ViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user_balance, _ = UserBalance.objects.get_or_create(user=self.request.user)
         return user_balance
-
-    def list(self, request, *args, **kwargs):
-        user_balance = self.get_queryset()
-        serializer = UserBalanceSerializer(user_balance)
-        return Response(serializer.data)
 
     @action(detail=False, methods=["GET"])
     def check_balance_history(self, request):
@@ -117,7 +112,7 @@ class UserBalanceViewSet(ModelViewSet):
         user_balance.save()
         deposit_processor = DepositProcessor()
         deposit_processor.create_balance_history(self.request.user, amount)
-        serializer = self.get_serializer(user_balance)
+        serializer = UserBalanceSerializer(user_balance)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
