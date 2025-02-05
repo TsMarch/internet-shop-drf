@@ -10,7 +10,7 @@ from rest_framework.mixins import RetrieveModelMixin
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet, ViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from .filters import ProductFilter
 from .mixins import ModelViewMixin
@@ -92,17 +92,23 @@ class ExternalOrderViewSet(ModelViewSet):
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserBalanceViewSet(RetrieveModelMixin, ViewSet):
+class UserBalanceViewSet(RetrieveModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user_balance, _ = UserBalance.objects.get_or_create(user=self.request.user)
         return user_balance
 
+    def get_serializer_class(self):
+        if self.action == "check_balance_history":
+            return UserBalanceHistorySerializer
+        return UserBalanceSerializer
+
     @action(detail=False, methods=["GET"])
     def check_balance_history(self, request):
         balance_history = UserBalanceHistory.objects.filter(user=self.request.user)
-        return Response(UserBalanceHistorySerializer(balance_history, many=True).data, status=status.HTTP_200_OK)
+        serializer = self.get_serializer(balance_history, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["PATCH"])
     def add_funds(self, request, *args, **kwargs):
@@ -112,7 +118,7 @@ class UserBalanceViewSet(RetrieveModelMixin, ViewSet):
         user_balance.save()
         deposit_processor = DepositProcessor()
         deposit_processor.create_balance_history(self.request.user, amount)
-        serializer = UserBalanceSerializer(user_balance)
+        serializer = self.get_serializer(user_balance)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
