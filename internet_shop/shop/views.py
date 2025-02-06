@@ -6,11 +6,11 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action, api_view
-from rest_framework.mixins import RetrieveModelMixin
+from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from rest_framework.viewsets import GenericViewSet
 
 from .filters import ProductFilter
 from .mixins import ModelViewMixin
@@ -60,13 +60,13 @@ def delete_attribute(request):
     return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
 
 
-class CreateProductRating(ModelViewSet):
+class CreateProductRating(CreateModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ProductRatingSerializer
     queryset = ProductRating.objects.all()
 
 
-class CreateProductComment(ModelViewSet):
+class CreateProductComment(CreateModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ProductCommentSerializer
     queryset = ProductComment.objects.all()
@@ -76,7 +76,7 @@ class CreateProductComment(ModelViewSet):
         return Response("not ready", status=status.HTTP_400_BAD_REQUEST)
 
 
-class ExternalOrderViewSet(ModelViewSet):
+class ExternalOrderViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = OrderSerializer
 
@@ -122,7 +122,7 @@ class UserBalanceViewSet(RetrieveModelMixin, GenericViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class UserRegistrationViewSet(ModelViewSet):
+class UserRegistrationViewSet(CreateModelMixin, GenericViewSet):
     serializer_class = UserRegistrationSerializer
     queryset = User.objects.all()
     serializer_action_classes = {
@@ -131,12 +131,12 @@ class UserRegistrationViewSet(ModelViewSet):
     }
 
 
-class ProductCategoryViewSet(ModelViewSet):
+class ProductCategoryViewSet(CreateModelMixin, GenericViewSet):
     queryset = ProductCategory.objects.all()
     serializer_class = CategorySerializer
 
 
-class ProductViewSet(ModelViewMixin, ModelViewSet):
+class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListModelMixin, GenericViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     filter_backends = [ProductFilter, DjangoFilterBackend]
@@ -206,7 +206,7 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class CartViewSet(ModelViewSet):
+class CartViewSet(GenericViewSet, RetrieveModelMixin, CreateModelMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = CartSerializer
 
@@ -277,7 +277,7 @@ class CartViewSet(ModelViewSet):
                     return Response(CartSerializer(cart).data, status=status.HTTP_204_NO_CONTENT)
 
 
-class OrderViewSet(ModelViewSet, ModelViewMixin):
+class OrderViewSet(GenericViewSet, ModelViewMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = OrderSerializer
     serializer_action_classes = {
