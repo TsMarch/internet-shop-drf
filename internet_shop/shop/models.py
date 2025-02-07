@@ -48,12 +48,14 @@ eav.register(Product)
 
 
 class ProductComment(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="comments")
     text = models.TextField("Отзыв", blank=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    rating = models.OneToOneField("ProductRating", on_delete=models.CASCADE, null=True, blank=True)
+    rating = models.OneToOneField(
+        "ProductRating", on_delete=models.CASCADE, null=True, blank=True, related_name="comment"
+    )
 
 
 class ProductRating(models.Model):
@@ -103,10 +105,11 @@ class Order(models.Model):
     delivery_flag = models.BooleanField(blank=True, default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     total_sum = models.DecimalField("Сумма заказа", decimal_places=6, max_digits=20, null=True)
+    products = models.ManyToManyField(Product, through="OrderItems", related_name="orders")
 
 
 class OrderItems(models.Model):
-    order = models.ForeignKey(Order, related_name="orderitems", on_delete=models.CASCADE)
+    order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     price = models.DecimalField(
         "Цена со скидкой",

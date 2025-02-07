@@ -6,14 +6,19 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action, api_view
-from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
+from rest_framework.mixins import (
+    CreateModelMixin,
+    ListModelMixin,
+    RetrieveModelMixin,
+    UpdateModelMixin,
+)
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from .filters import ProductFilter
-from .mixins import ModelViewMixin
+from .mixins import ModelViewMixin, PurchasedProductMixin
 from .models import (
     Cart,
     CartItems,
@@ -60,16 +65,60 @@ def delete_attribute(request):
     return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
 
 
-class CreateProductRating(CreateModelMixin, GenericViewSet):
+class ProductRatingView(CreateModelMixin, UpdateModelMixin, GenericViewSet, PurchasedProductMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = ProductRatingSerializer
     queryset = ProductRating.objects.all()
 
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        product = request.data.get("product")
 
-class CreateProductComment(CreateModelMixin, GenericViewSet):
+        error = self.has_purchased_product(user, product)
+
+        if error:
+            return Response(
+                {"error": "Рейтинг можно поставить только на купленный товар"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ProductCommentView(CreateModelMixin, GenericViewSet, PurchasedProductMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = ProductCommentSerializer
     queryset = ProductComment.objects.all()
+
+    def get_rating(self, user, product):
+        return ProductRating.objects.filter(user=user, product=product).first()
+
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        product = request.data.get("product")
+
+        error = self.has_purchased_product(user, product)
+        if error:
+            return error
+
+        rating = self.get_rating(user, product)
+        if not rating:
+            rating_value = request.data.get("rating")
+            if not rating_value:
+                return Response(
+                    {"error": "Нельзя оставить отзыв без рейтинга"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            rating = ProductRating.objects.create(user=user, product=product, rating=rating_value)
+
+        request.data["rating"] = rating.id
+
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
     @action(methods=["POST"], detail=False)
     def get_related_comments(self, request):

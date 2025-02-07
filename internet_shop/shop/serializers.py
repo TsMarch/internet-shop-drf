@@ -97,19 +97,6 @@ class ProductRatingSerializer(serializers.ModelSerializer):
         model = ProductRating
         fields = "__all__"
 
-    def validate(self, data):
-        user = self.context["request"].user
-        product = data.get("product")
-
-        if not Order.objects.filter(order__user=user, product=product).exists():
-            raise serializers.ValidationError("Рейтинг можно поставить только на купленный товар")
-
-        return data
-
-    def create(self, validated_data):
-        validated_data["user"] = self.context["request"].user
-        return super().create(validated_data)
-
 
 class ProductCommentSerializer(serializers.ModelSerializer):
     rating = serializers.PrimaryKeyRelatedField(queryset=ProductRating.objects.all(), required=True)
@@ -117,22 +104,6 @@ class ProductCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductComment
         fields = "__all__"
-
-    def validate(self, data):
-        user = self.context["request"].user
-        product = data.get("product")
-
-        if not OrderItems.objects.filter(order__user=user, product=product).exists():
-            raise serializers.ValidationError("Рейтинг можно поставить только на купленный товар")
-
-        if not ProductRating.objects.filter(user=user, product=product).exists():
-            raise serializers.ValidationError("Нельзя оставить отзыв без рейтинга")
-
-        return data
-
-    def create(self, validated_data):
-        validated_data["user"] = self.context["request"].user
-        return super().create(validated_data)
 
 
 class CartItemSerializer(serializers.ModelSerializer):
