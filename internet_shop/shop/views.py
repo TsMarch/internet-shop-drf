@@ -264,13 +264,13 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class CartViewSet(GenericViewSet, RetrieveModelMixin, CreateModelMixin):
+class CartViewSet(GenericViewSet, RetrieveModelMixin, CreateModelMixin, ListModelMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = CartSerializer
 
     def get_queryset(self):
         user_cart, _ = Cart.objects.get_or_create(user=self.request.user)
-        return user_cart
+        return Cart.objects.prefetch_related("items__product").get(id=user_cart.id)
 
     def list(self, request, *args, **kwargs):
         cart = self.get_queryset()
