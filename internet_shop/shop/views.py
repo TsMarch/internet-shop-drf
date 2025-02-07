@@ -83,6 +83,15 @@ class ProductRatingView(CreateModelMixin, UpdateModelMixin, GenericViewSet, Purc
 
         return super().create(request, *args, **kwargs)
 
+    def update(self, request, *args, **kwargs):
+        product = request.data.get("product")
+
+        if not product:
+            product = self.kwargs.get("pk")
+            request.data["product"] = product
+
+        return super().update(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
