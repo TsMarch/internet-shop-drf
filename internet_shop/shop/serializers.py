@@ -7,13 +7,14 @@ from rest_framework import serializers
 from .models import (
     Cart,
     CartItems,
-    Comment,
     Order,
     OrderItems,
     Product,
     ProductCategory,
-    ProductComment,
     ProductRating,
+    ProductReview,
+    ReviewComment,
+    ReviewCommentReply,
     UserBalance,
     UserBalanceHistory,
 )
@@ -53,19 +54,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return user
 
 
-class RecursiveCommentSerializer(serializers.Serializer):
-    def to_representation(self, instance):
-        return CommentSerializer(instance).data
-
-
-class CommentSerializer(serializers.ModelSerializer):
-    children = RecursiveCommentSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Comment
-        fields = ["id", "user", "text", "created_at", "children"]
-
-
 class ProductListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     attributes = serializers.DictField(source="eav.get_values_dict", read_only=True)
@@ -102,8 +90,8 @@ class ProductSerializer(ProductListSerializer, DynamicFieldsModelSerializer):
         return super().create(validated_data)
 
     def get_comments(self, obj):
-        comments = ProductComment.objects.filter(product=obj)
-        return ProductCommentSerializer(comments, many=True).data
+        comments = ProductReview.objects.filter(product=obj)
+        return ProductReviewSerializer(comments, many=True).data
 
 
 class ProductRatingSerializer(serializers.ModelSerializer):
@@ -112,11 +100,26 @@ class ProductRatingSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class ProductCommentSerializer(serializers.ModelSerializer):
-    rating = serializers.PrimaryKeyRelatedField(queryset=ProductRating.objects.all(), required=True)
+class ReviewCommentReplySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReviewCommentReply
+        fields = "__all__"
+
+
+class ReviewCommentSerializer(serializers.ModelSerializer):
+    replies = ReviewCommentReplySerializer(many=True, read_only=True)
 
     class Meta:
-        model = ProductComment
+        model = ReviewComment
+        fields = "__all__"
+
+
+class ProductReviewSerializer(serializers.ModelSerializer):
+    rating = serializers.PrimaryKeyRelatedField(queryset=ProductRating.objects.all(), required=True)
+    comments = ReviewCommentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ProductReview
         fields = "__all__"
 
 

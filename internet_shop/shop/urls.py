@@ -6,9 +6,11 @@ from .views import (
     ExternalOrderViewSet,
     OrderViewSet,
     ProductCategoryViewSet,
-    ProductCommentView,
     ProductRatingView,
+    ProductReviewView,
     ProductViewSet,
+    ReviewCommentReplyView,
+    ReviewCommentView,
     UserBalanceViewSet,
     UserRegistrationViewSet,
     delete_attribute,
@@ -29,9 +31,13 @@ user_balance_router.register(r"", UserBalanceViewSet, basename="balance")
 external_order_router = routers.DefaultRouter()
 external_order_router.register(r"", ExternalOrderViewSet, basename="external-orders")
 product_comment_router = routers.DefaultRouter()
-product_comment_router.register(r"", ProductCommentView, basename="product-comment")
+product_comment_router.register(r"", ProductReviewView, basename="product-comment")
 product_rating_router = routers.DefaultRouter()
-product_rating_router.register(r"", ProductRatingView, basename="product-rating")
+product_rating_router.register(r"", ProductRatingView, basename="product-rating"),
+review_comment_view = routers.DefaultRouter()
+review_comment_view.register(r"", ReviewCommentView)
+review_comment_reply_view = routers.DefaultRouter()
+review_comment_reply_view.register(r"", ReviewCommentReplyView)
 
 
 urlpatterns = [
@@ -45,4 +51,6 @@ urlpatterns = [
     path("delete_attribute/", delete_attribute),
     path("product-comment/", include(product_comment_router.urls)),
     path("product-rating/", include(product_rating_router.urls)),
+    path("review-comment/", include(review_comment_view.urls)),
+    path("review-comment-reply/", include(review_comment_reply_view.urls)),
 ]

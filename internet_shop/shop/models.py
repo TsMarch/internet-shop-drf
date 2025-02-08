@@ -47,7 +47,7 @@ class Product(models.Model):
 eav.register(Product)
 
 
-class ProductComment(models.Model):
+class ProductReview(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="comments")
     text = models.TextField("Отзыв", blank=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -74,13 +74,26 @@ class ProductRating(models.Model):
         unique_together = ("product", "user")
 
 
-class Comment(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="name")
-    product_comment = models.ForeignKey(ProductComment, on_delete=models.CASCADE, related_name="replies")
-    parent = models.ForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children")
+class ReviewComment(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    review = models.ForeignKey(ProductReview, on_delete=models.CASCADE, related_name="comments")
     text = models.TextField("Комментарий", blank=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+
+class ReviewCommentReply(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    review_comment = models.ForeignKey(ReviewComment, on_delete=models.CASCADE, related_name="replies")
+    text = models.TextField("Текст ответа", blank=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at"]
 
 
 class Cart(models.Model):

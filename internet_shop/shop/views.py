@@ -25,8 +25,10 @@ from .models import (
     Order,
     Product,
     ProductCategory,
-    ProductComment,
     ProductRating,
+    ProductReview,
+    ReviewComment,
+    ReviewCommentReply,
     User,
     UserBalance,
     UserBalanceHistory,
@@ -36,10 +38,12 @@ from .serializers import (
     CategorySerializer,
     OrderDetailSerializer,
     OrderSerializer,
-    ProductCommentSerializer,
     ProductListSerializer,
     ProductRatingSerializer,
+    ProductReviewSerializer,
     ProductSerializer,
+    ReviewCommentReplySerializer,
+    ReviewCommentSerializer,
     UserBalanceHistorySerializer,
     UserBalanceSerializer,
     UserRegistrationSerializer,
@@ -96,10 +100,22 @@ class ProductRatingView(CreateModelMixin, UpdateModelMixin, GenericViewSet, Purc
         serializer.save(user=self.request.user)
 
 
-class ProductCommentView(CreateModelMixin, GenericViewSet, PurchasedProductMixin):
+class ReviewCommentReplyView(GenericViewSet, CreateModelMixin):
     permission_classes = [IsAuthenticated]
-    serializer_class = ProductCommentSerializer
-    queryset = ProductComment.objects.all()
+    serializer_class = ReviewCommentReplySerializer
+    queryset = ReviewCommentReply.objects.all()
+
+
+class ReviewCommentView(GenericViewSet, CreateModelMixin):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ReviewCommentSerializer
+    queryset = ReviewComment.objects.all()
+
+
+class ProductReviewView(CreateModelMixin, GenericViewSet, PurchasedProductMixin):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProductReviewSerializer
+    queryset = ProductReview.objects.all()
 
     def get_rating(self, user, product):
         return ProductRating.objects.filter(user=user, product=product).first()
