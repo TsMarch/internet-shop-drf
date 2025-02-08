@@ -7,6 +7,7 @@ from rest_framework import serializers
 from .models import (
     Cart,
     CartItems,
+    Comment,
     Order,
     OrderItems,
     Product,
@@ -50,6 +51,19 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             username=validated_data["username"], email=validated_data["email"], password=validated_data["password"]
         )
         return user
+
+
+class RecursiveCommentSerializer(serializers.Serializer):
+    def to_representation(self, instance):
+        return CommentSerializer(instance).data
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    children = RecursiveCommentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Comment
+        fields = ["id", "user", "text", "created_at", "children"]
 
 
 class ProductListSerializer(serializers.ModelSerializer):

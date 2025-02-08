@@ -74,6 +74,15 @@ class ProductRating(models.Model):
         unique_together = ("product", "user")
 
 
+class Comment(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="name")
+    product_comment = models.ForeignKey(ProductComment, on_delete=models.CASCADE, related_name="replies")
+    parent = models.ForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children")
+    text = models.TextField("Комментарий", blank=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class Cart(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
 
