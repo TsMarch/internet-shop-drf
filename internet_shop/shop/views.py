@@ -2,6 +2,7 @@ import json
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -126,7 +127,7 @@ class ProductReviewView(CreateModelMixin, GenericViewSet, PurchasedProductMixin)
 
         error = self.has_purchased_product(user, product)
         if error:
-            return error
+            return Response({"error": "товар не куплен"}, status=status.HTTP_400_BAD_REQUEST)
 
         rating = self.get_rating(user, product)
         if not rating:
@@ -211,7 +212,14 @@ class ProductCategoryViewSet(CreateModelMixin, GenericViewSet):
 
 
 class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListModelMixin, GenericViewSet):
-    queryset = Product.objects.all()
+    queryset = Product.objects.prefetch_related(
+        Prefetch(
+            "reviews",
+            queryset=ProductReview.objects.select_related("user").prefetch_related(
+                Prefetch("comments", queryset=ReviewComment.objects.select_related("user").prefetch_related("replies"))
+            ),
+        )
+    )
     serializer_class = ProductSerializer
     filter_backends = [ProductFilter, DjangoFilterBackend]
     serializer_action_classes = {
