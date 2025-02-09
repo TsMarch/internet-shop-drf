@@ -1,7 +1,6 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.db.models import Avg, Count
 from rest_framework import serializers
 
 from .models import (
@@ -57,19 +56,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 class ProductListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     attributes = serializers.DictField(source="eav.get_values_dict", read_only=True)
-    average_rating = serializers.SerializerMethodField()
-    rating_count = serializers.SerializerMethodField()
+    average_rating = serializers.FloatField(read_only=True)
+    rating_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Product
         fields = "__all__"
-
-    def get_average_rating(self, obj):
-        average = obj.productrating_set.aggregate(Avg("rating")).get("rating__avg")
-        return round(average, 2) if average else 0
-
-    def get_rating_count(self, obj):
-        return obj.productrating_set.aggregate(count=Count("rating")).get("count", 0)
 
 
 class ProductSerializer(ProductListSerializer, DynamicFieldsModelSerializer):

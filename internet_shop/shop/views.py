@@ -2,7 +2,7 @@ import json
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db.models import Prefetch
+from django.db.models import Avg, Count, Prefetch
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -212,14 +212,6 @@ class ProductCategoryViewSet(CreateModelMixin, GenericViewSet):
 
 
 class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListModelMixin, GenericViewSet):
-    queryset = Product.objects.prefetch_related(
-        Prefetch(
-            "reviews",
-            queryset=ProductReview.objects.select_related("user").prefetch_related(
-                Prefetch("comments", queryset=ReviewComment.objects.select_related("user").prefetch_related("replies"))
-            ),
-        )
-    )
     serializer_class = ProductSerializer
     filter_backends = [ProductFilter, DjangoFilterBackend]
     serializer_action_classes = {
@@ -227,6 +219,22 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
         "create": ProductSerializer,
         "retrieve": ProductSerializer,
     }
+
+    def get_queryset(self):
+        if self.action == "list":
+            return Product.objects.select_related("category").annotate(
+                average_rating=Avg("productrating__rating"), rating_count=Count("productrating__rating")
+            )
+        return Product.objects.prefetch_related(
+            Prefetch(
+                "reviews",
+                queryset=ProductReview.objects.select_related("user").prefetch_related(
+                    Prefetch(
+                        "comments", queryset=ReviewComment.objects.select_related("user").prefetch_related("replies")
+                    )
+                ),
+            )
+        )
 
     @staticmethod
     def attrs_handler(attrs, product_id):
