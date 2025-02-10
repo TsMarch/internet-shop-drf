@@ -301,7 +301,9 @@ class CartViewSet(GenericViewSet, RetrieveModelMixin, CreateModelMixin, ListMode
     serializer_class = CartSerializer
 
     def get_queryset(self):
-        user_cart, _ = Cart.objects.get_or_create(user=self.request.user)
+        user_cart, created = Cart.objects.get_or_create(user=self.request.user)
+        if created:
+            return user_cart
         return Cart.objects.prefetch_related("items__product").get(id=user_cart.id)
 
     def list(self, request, *args, **kwargs):
