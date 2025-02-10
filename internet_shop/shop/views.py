@@ -2,25 +2,34 @@ import json
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
+from django.db.models import Avg, Count, Prefetch
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action, api_view
+from rest_framework.mixins import (
+    CreateModelMixin,
+    ListModelMixin,
+    RetrieveModelMixin,
+    UpdateModelMixin,
+)
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import GenericViewSet
 
 from .filters import ProductFilter
-from .mixins import ModelViewMixin
+from .mixins import ModelViewMixin, PurchasedProductMixin
 from .models import (
     Cart,
     CartItems,
     Order,
     Product,
     ProductCategory,
-    ProductComment,
     ProductRating,
+    ProductReview,
+    ReviewComment,
+    ReviewCommentReply,
     User,
     UserBalance,
     UserBalanceHistory,
@@ -30,10 +39,12 @@ from .serializers import (
     CategorySerializer,
     OrderDetailSerializer,
     OrderSerializer,
-    ProductCommentSerializer,
     ProductListSerializer,
     ProductRatingSerializer,
+    ProductReviewSerializer,
     ProductSerializer,
+    ReviewCommentReplySerializer,
+    ReviewCommentSerializer,
     UserBalanceHistorySerializer,
     UserBalanceSerializer,
     UserRegistrationSerializer,
@@ -59,23 +70,88 @@ def delete_attribute(request):
     return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
 
 
-class CreateProductRating(ModelViewSet):
+class ProductRatingView(CreateModelMixin, UpdateModelMixin, GenericViewSet, PurchasedProductMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = ProductRatingSerializer
     queryset = ProductRating.objects.all()
 
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        product = request.data.get("product")
 
-class CreateProductComment(ModelViewSet):
+        error = self.has_purchased_product(user, product)
+
+        if error:
+            return Response(
+                {"error": "Рейтинг можно поставить только на купленный товар"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        product = request.data.get("product")
+
+        if not product:
+            product = self.kwargs.get("pk")
+            request.data["product"] = product
+
+        return super().update(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ReviewCommentReplyView(GenericViewSet, CreateModelMixin):
     permission_classes = [IsAuthenticated]
-    serializer_class = ProductCommentSerializer
-    queryset = ProductComment.objects.all()
+    serializer_class = ReviewCommentReplySerializer
+    queryset = ReviewCommentReply.objects.all()
+
+
+class ReviewCommentView(GenericViewSet, CreateModelMixin):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ReviewCommentSerializer
+    queryset = ReviewComment.objects.all()
+
+
+class ProductReviewView(CreateModelMixin, GenericViewSet, PurchasedProductMixin):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ProductReviewSerializer
+    queryset = ProductReview.objects.all()
+
+    def get_rating(self, user, product):
+        return ProductRating.objects.filter(user=user, product=product).first()
+
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        product = request.data.get("product")
+
+        error = self.has_purchased_product(user, product)
+        if error:
+            return Response({"error": "товар не куплен"}, status=status.HTTP_400_BAD_REQUEST)
+
+        rating = self.get_rating(user, product)
+        if not rating:
+            rating_value = request.data.get("rating")
+            if not rating_value:
+                return Response(
+                    {"error": "Нельзя оставить отзыв без рейтинга"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            rating = ProductRating.objects.create(user=user, product=product, rating=rating_value)
+
+        request.data["rating"] = rating.id
+
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
     @action(methods=["POST"], detail=False)
     def get_related_comments(self, request):
         return Response("not ready", status=status.HTTP_400_BAD_REQUEST)
 
 
-class ExternalOrderViewSet(ModelViewSet):
+class ExternalOrderViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = OrderSerializer
 
@@ -91,23 +167,23 @@ class ExternalOrderViewSet(ModelViewSet):
                     return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserBalanceViewSet(ModelViewSet):
-    serializer_class = UserBalanceSerializer
+class UserBalanceViewSet(RetrieveModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user_balance, _ = UserBalance.objects.get_or_create(user=self.request.user)
         return user_balance
 
-    def list(self, request, *args, **kwargs):
-        user_balance = self.get_queryset()
-        serializer = UserBalanceSerializer(user_balance)
-        return Response(serializer.data)
+    def get_serializer_class(self):
+        if self.action == "check_balance_history":
+            return UserBalanceHistorySerializer
+        return UserBalanceSerializer
 
     @action(detail=False, methods=["GET"])
     def check_balance_history(self, request):
         balance_history = UserBalanceHistory.objects.filter(user=self.request.user)
-        return Response(UserBalanceHistorySerializer(balance_history, many=True).data, status=status.HTTP_200_OK)
+        serializer = self.get_serializer(balance_history, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["PATCH"])
     def add_funds(self, request, *args, **kwargs):
@@ -121,7 +197,7 @@ class UserBalanceViewSet(ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class UserRegistrationViewSet(ModelViewSet):
+class UserRegistrationViewSet(CreateModelMixin, GenericViewSet):
     serializer_class = UserRegistrationSerializer
     queryset = User.objects.all()
     serializer_action_classes = {
@@ -130,13 +206,12 @@ class UserRegistrationViewSet(ModelViewSet):
     }
 
 
-class ProductCategoryViewSet(ModelViewSet):
+class ProductCategoryViewSet(CreateModelMixin, GenericViewSet):
     queryset = ProductCategory.objects.all()
     serializer_class = CategorySerializer
 
 
-class ProductViewSet(ModelViewMixin, ModelViewSet):
-    queryset = Product.objects.all()
+class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListModelMixin, GenericViewSet):
     serializer_class = ProductSerializer
     filter_backends = [ProductFilter, DjangoFilterBackend]
     serializer_action_classes = {
@@ -144,6 +219,22 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         "create": ProductSerializer,
         "retrieve": ProductSerializer,
     }
+
+    def get_queryset(self):
+        if self.action == "list":
+            return Product.objects.select_related("category").annotate(
+                average_rating=Avg("productrating__rating"), rating_count=Count("productrating__rating")
+            )
+        return Product.objects.prefetch_related(
+            Prefetch(
+                "reviews",
+                queryset=ProductReview.objects.select_related("user").prefetch_related(
+                    Prefetch(
+                        "comments", queryset=ReviewComment.objects.select_related("user").prefetch_related("replies")
+                    )
+                ),
+            )
+        )
 
     @staticmethod
     def attrs_handler(attrs, product_id):
@@ -205,13 +296,15 @@ class ProductViewSet(ModelViewMixin, ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class CartViewSet(ModelViewSet):
+class CartViewSet(GenericViewSet, RetrieveModelMixin, CreateModelMixin, ListModelMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = CartSerializer
 
     def get_queryset(self):
-        user_cart, _ = Cart.objects.get_or_create(user=self.request.user)
-        return user_cart
+        user_cart, created = Cart.objects.get_or_create(user=self.request.user)
+        if created:
+            return user_cart
+        return Cart.objects.prefetch_related("items__product").get(id=user_cart.id)
 
     def list(self, request, *args, **kwargs):
         cart = self.get_queryset()
@@ -276,7 +369,7 @@ class CartViewSet(ModelViewSet):
                     return Response(CartSerializer(cart).data, status=status.HTTP_204_NO_CONTENT)
 
 
-class OrderViewSet(ModelViewSet, ModelViewMixin):
+class OrderViewSet(GenericViewSet, ModelViewMixin):
     permission_classes = [IsAuthenticated]
     serializer_class = OrderSerializer
     serializer_action_classes = {
