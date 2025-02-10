@@ -6,19 +6,17 @@ from shop.models import (
     Product,
     ProductCategory,
     ProductRating,
-    ProductReview,
-    ReviewComment,
-    ReviewCommentReply,
+    ProductReviewComment,
     User,
 )
 
 
 class Command(BaseCommand):
-    help = "Генерирует тестовые данные: категория, продукты, отзывы, комментарии и ответы"
+    help = "Генерирует тестовые данные: категории, продукты, отзывы, комментарии и ответы"
 
     @transaction.atomic
     def handle(self, *args, **kwargs):
-        category = ProductCategory.objects.create(name="tv")
+        category = ProductCategory.objects.create(name="TV")
 
         for i in range(10):
             old_price = random.randint(100, 5000)
@@ -35,27 +33,52 @@ class Command(BaseCommand):
                 price=price,
                 available_quantity=available_quantity,
             )
+
         user = User.objects.first()
         products = list(Product.objects.all())
 
         for _ in range(20):
             product = random.choice(products)
 
+            # Проверяем, есть ли уже рейтинг для данного пользователя и продукта
             rating, created = ProductRating.objects.get_or_create(
                 user=user, product=product, defaults={"rating": random.randint(1, 5)}
             )
 
-            if not ProductReview.objects.filter(rating=rating).exists():
-                review = ProductReview.objects.create(
-                    product=product, user=user, text=f"Отзыв {random.randint(1, 1000)}", rating=rating
+            # Если рейтинг уже существовал, обновим его случайным значением
+            if not created:
+                rating.rating = random.randint(1, 5)
+                rating.save(update_fields=["rating"])
+
+            # Проверяем, есть ли уже отзыв с этим рейтингом
+            review = ProductReviewComment.objects.filter(rating=rating).first()
+
+            # Если такого отзыва нет, создаем новый
+            if not review:
+                review = ProductReviewComment.objects.create(
+                    product=product,
+                    user=user,
+                    text=f"Отзыв {random.randint(1, 1000)}",
+                    type=ProductReviewComment.NodeType.REVIEW,
+                    rating=rating,
                 )
 
-                for _ in range(3):
-                    comment = ReviewComment.objects.create(
-                        review=review, user=user, text=f"Комментарий на отзыв {review.id}"
-                    )
+            # Создаем 3 комментария к каждому отзыву
+            for _ in range(3):
+                comment = ProductReviewComment.objects.create(
+                    product=product,
+                    user=user,
+                    text=f"Комментарий на отзыв {review.id}",
+                    type=ProductReviewComment.NodeType.COMMENT,
+                    parent=review,
+                )
 
-                    for _ in range(5):
-                        ReviewCommentReply.objects.create(
-                            review_comment=comment, user=user, text=f"Ответ на комментарий {comment.id}"
-                        )
+                # Создаем 5 ответов на каждый комментарий
+                for _ in range(5):
+                    ProductReviewComment.objects.create(
+                        product=product,
+                        user=user,
+                        text=f"Ответ на комментарий {comment.id}",
+                        type=ProductReviewComment.NodeType.REPLY,
+                        parent=comment,
+                    )

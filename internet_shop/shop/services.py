@@ -15,6 +15,8 @@ from .models import (
     OrderItems,
     Product,
     ProductCategory,
+    ProductRating,
+    ProductReviewComment,
     UserBalance,
     UserBalanceHistory,
 )
@@ -30,6 +32,33 @@ DATATYPE_MAP = {
     "json": Attribute.TYPE_JSON,
     "csv": Attribute.TYPE_CSV,
 }
+
+
+class ProductReviewCreateService:
+    def __init__(self, product_id, user):
+        self.product = Product.objects.get(id=product_id)
+        self.user = user
+
+    def has_purchased_product(self):
+        if not Order.objects.filter(user=self.user, products=self.product).exists():
+            return ValidationError({"error": "товар не приобретен"})
+
+    def get_rating(self, rating_value=None):
+        rating = ProductRating.objects.filter(user=self.user, product=self.product).first()
+
+        if not rating:
+            if rating_value is None:
+                raise ValidationError({"error": "необходимо указать рейтинг"})
+            rating = ProductRating.objects.create(user=self.user, product=self.product, rating=rating_value)
+        return rating
+
+    def create_review(self, text, rating_value):
+        self.has_purchased_product()
+        rating = self.get_rating(rating_value)
+        review = ProductReviewComment.objects.create(
+            product=self.product, user=self.user, text=text, type=ProductReviewComment.NodeType.REVIEW, rating=rating
+        )
+        return review
 
 
 class ProductAttributeService:

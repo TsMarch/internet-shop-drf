@@ -19,7 +19,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from .filters import ProductFilter
-from .mixins import ModelViewMixin, PurchasedProductMixin
+from .mixins import ModelViewMixin
 from .models import (
     Cart,
     CartItems,
@@ -27,9 +27,7 @@ from .models import (
     Product,
     ProductCategory,
     ProductRating,
-    ProductReview,
-    ReviewComment,
-    ReviewCommentReply,
+    ProductReviewComment,
     User,
     UserBalance,
     UserBalanceHistory,
@@ -41,10 +39,8 @@ from .serializers import (
     OrderSerializer,
     ProductListSerializer,
     ProductRatingSerializer,
-    ProductReviewSerializer,
+    ProductReviewCommentSerializer,
     ProductSerializer,
-    ReviewCommentReplySerializer,
-    ReviewCommentSerializer,
     UserBalanceHistorySerializer,
     UserBalanceSerializer,
     UserRegistrationSerializer,
@@ -58,6 +54,7 @@ from .services import (
     PaymentProcessor,
     ProductAttributeService,
     ProductFileService,
+    ProductReviewCreateService,
     ProductService,
 )
 
@@ -70,7 +67,7 @@ def delete_attribute(request):
     return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
 
 
-class ProductRatingView(CreateModelMixin, UpdateModelMixin, GenericViewSet, PurchasedProductMixin):
+class ProductRatingView(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ProductRatingSerializer
     queryset = ProductRating.objects.all()
@@ -78,13 +75,11 @@ class ProductRatingView(CreateModelMixin, UpdateModelMixin, GenericViewSet, Purc
     def create(self, request, *args, **kwargs):
         user = request.user
         product = request.data.get("product")
-
-        error = self.has_purchased_product(user, product)
-
-        if error:
-            return Response(
-                {"error": "Рейтинг можно поставить только на купленный товар"}, status=status.HTTP_400_BAD_REQUEST
-            )
+        service = ProductReviewCreateService(product_id=product, user=user)
+        try:
+            service.has_purchased_product()
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return super().create(request, *args, **kwargs)
 
@@ -101,22 +96,30 @@ class ProductRatingView(CreateModelMixin, UpdateModelMixin, GenericViewSet, Purc
         serializer.save(user=self.request.user)
 
 
-class ReviewCommentReplyView(GenericViewSet, CreateModelMixin):
+class ProductReviewTesting(GenericViewSet):
+    queryset = ProductReviewComment
     permission_classes = [IsAuthenticated]
-    serializer_class = ReviewCommentReplySerializer
-    queryset = ReviewCommentReply.objects.all()
+
+    @action(detail=False, methods=["POST"])
+    def create_review(self, request):
+        user = self.request.user
+        product_id = request.data.get("product_id")
+        rating_value = request.data.get("rating")
+        text = request.data.get("text")
+
+        try:
+            service = ProductReviewCreateService(product_id=product_id, user=user)
+            review = service.create_review(text, rating_value)
+            serializer = ProductReviewCommentSerializer(review)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ReviewCommentView(GenericViewSet, CreateModelMixin):
+class ProductReviewView(CreateModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated]
-    serializer_class = ReviewCommentSerializer
-    queryset = ReviewComment.objects.all()
-
-
-class ProductReviewView(CreateModelMixin, GenericViewSet, PurchasedProductMixin):
-    permission_classes = [IsAuthenticated]
-    serializer_class = ProductReviewSerializer
-    queryset = ProductReview.objects.all()
+    # serializer_class = ProductReviewSerializer
+    # queryset = ProductReview.objects.all()
 
     def get_rating(self, user, product):
         return ProductRating.objects.filter(user=user, product=product).first()
@@ -228,9 +231,14 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
         return Product.objects.prefetch_related(
             Prefetch(
                 "reviews",
-                queryset=ProductReview.objects.select_related("user").prefetch_related(
+                queryset=ProductReviewComment.objects.filter(type=ProductReviewComment.NodeType.REVIEW)
+                .select_related("user", "rating")
+                .prefetch_related(
                     Prefetch(
-                        "comments", queryset=ReviewComment.objects.select_related("user").prefetch_related("replies")
+                        "children",
+                        queryset=ProductReviewComment.objects.select_related("user").prefetch_related(
+                            Prefetch("children", queryset=ProductReviewComment.objects.select_related("user"))
+                        ),
                     )
                 ),
             )
