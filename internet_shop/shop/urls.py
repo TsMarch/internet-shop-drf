@@ -6,6 +6,7 @@ from .views import (
     ExternalOrderViewSet,
     OrderViewSet,
     ProductCategoryViewSet,
+    ProductReviewCommentView,
     ProductViewSet,
     UserBalanceViewSet,
     UserRegistrationViewSet,
@@ -26,7 +27,8 @@ user_balance_router = routers.DefaultRouter()
 user_balance_router.register(r"", UserBalanceViewSet, basename="balance")
 external_order_router = routers.DefaultRouter()
 external_order_router.register(r"", ExternalOrderViewSet, basename="external-orders")
-
+review_comment_router = routers.DefaultRouter()
+review_comment_router.register(r"", ProductReviewCommentView, basename="reviews-comments")
 
 urlpatterns = [
     path("product/", include(shop_router.urls)),
@@ -37,4 +39,5 @@ urlpatterns = [
     path("balance/", include(user_balance_router.urls)),
     path("external/", include(external_order_router.urls)),
     path("delete_attribute/", delete_attribute),
+    path("review-comment/", include(review_comment_router.urls)),
 ]

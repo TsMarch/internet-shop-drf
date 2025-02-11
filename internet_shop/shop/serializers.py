@@ -61,47 +61,46 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class ProductSerializer(ProductListSerializer, DynamicFieldsModelSerializer):
-    reviews_comments_replies = serializers.SerializerMethodField()
+class ProductReviewCommentSerializer(serializers.ModelSerializer):
+    replies = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductReviewComment
+        fields = ("id", "user", "text", "rating", "created_at", "replies")
+
+    def get_replies(self, obj):
+        return ProductReviewCommentSerializer(getattr(obj, "replies_list", []), many=True).data
+
+
+class ProductSerializer(serializers.ModelSerializer):
+    reviews = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
-        fields = "__all__"
+        fields = ("id", "name", "description", "price", "reviews")
 
     def create(self, validated_data):
         old_price = validated_data.get("old_price")
         discount = validated_data.get("discount")
-
-        if old_price is not None and discount is not None:
-            validated_data["price"] = Decimal(old_price - old_price * discount / 100)
-        else:
-            validated_data["price"] = None
-
+        match all([old_price is not None, discount is not None]):
+            case True:
+                validated_data["price"] = Decimal(old_price - old_price * discount / 100)
+            case _:
+                validated_data["price"] = None
         return super().create(validated_data)
 
-    def get_reviews_comments_replies(self, obj):
-        reviews = ProductReviewComment.objects.filter(
-            product=obj, type=ProductReviewComment.NodeType.REVIEW
-        ).select_related("user")
-        comments = ProductReviewComment.objects.filter(
-            product=obj, type=ProductReviewComment.NodeType.COMMENT
-        ).select_related("user")
-        replies = ProductReviewComment.objects.filter(
-            product=obj, type=ProductReviewComment.NodeType.REPLY
-        ).select_related("user")
+    def get_reviews(self, obj):
+        comment_cache = {c.id: c for c in obj.prefetched_reviews}
 
-        return self.build_comment_hierarchy(reviews, comments, replies)
+        for comment in comment_cache.values():
+            if comment.parent_id and comment.parent_id in comment_cache:
+                parent = comment_cache[comment.parent_id]
+                if not hasattr(parent, "replies_list"):
+                    parent.replies_list = []
+                parent.replies_list.append(comment)
 
-    def build_comment_hierarchy(self, reviews, comments, replies):
-        pass
-
-
-class ProductReviewCommentSerializer(serializers.ModelSerializer):
-    rating = serializers.IntegerField()
-
-    class Meta:
-        model = ProductReviewComment
-        fields = ["id", "user", "text", "type", "created_at", "updated_at", "rating", "children"]
+        root_comments = [c for c in comment_cache.values() if c.parent_id is None]
+        return ProductReviewCommentSerializer(root_comments, many=True).data
 
 
 class CartItemSerializer(serializers.ModelSerializer):

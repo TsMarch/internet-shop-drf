@@ -42,10 +42,20 @@ class ProductReviewCreateService:
         if not Order.objects.filter(user=self.user, products=self.product).exists():
             return ValidationError({"error": "товар не приобретен"})
 
-    def create_review(self, text):
+    def get_rating(self):
+        rating = (
+            ProductReviewComment.objects.filter(product=self.product, user=self.user)
+            .values_list("rating", flat=True)
+            .first()
+        )
+        return rating
+
+    def create_review(self, text, rating_value):
         self.has_purchased_product()
+        if rating_value is None:
+            rating_value = self.get_rating()
         review = ProductReviewComment.objects.create(
-            product=self.product, user=self.user, text=text, type=ProductReviewComment.NodeType.REVIEW
+            product=self.product, user=self.user, text=text, rating=rating_value
         )
         return review
 

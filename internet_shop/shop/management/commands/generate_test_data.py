@@ -3,13 +3,7 @@ from decimal import Decimal
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
-
-from internet_shop.shop.models import (
-    Product,
-    ProductCategory,
-    ProductReviewComment,
-    User,
-)
+from shop.models import Product, ProductCategory, ProductReviewComment, User
 
 
 class Command(BaseCommand):
@@ -44,7 +38,6 @@ class Command(BaseCommand):
                 product=product,
                 user=superuser,
                 text=f"Отзыв {random.randint(1, 1000)}",
-                type=ProductReviewComment.NodeType.REVIEW,
                 rating=random.randint(1, 5),
             )
 
@@ -53,7 +46,6 @@ class Command(BaseCommand):
                     product=product,
                     user=superuser,
                     text=f"Комментарий на отзыв {review.id}",
-                    type=ProductReviewComment.NodeType.COMMENT,
                     parent=review,
                 )
 
@@ -62,6 +54,5 @@ class Command(BaseCommand):
                         product=product,
                         user=superuser,
                         text=f"Ответ на комментарий {comment.id}",
-                        type=ProductReviewComment.NodeType.REPLY,
                         parent=comment,
                     )

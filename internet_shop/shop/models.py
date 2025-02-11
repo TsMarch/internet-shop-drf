@@ -3,8 +3,6 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
 
-# from django.db.models import Q
-
 
 class ProductCategory(models.Model):
     name = models.CharField("Название категории", max_length=100, unique=True)
@@ -68,12 +66,13 @@ class ProductReviewComment(models.Model):
     class Meta:
         ordering = ["created_at"]
 
-    #       constraints = [
-    #         models.UniqueConstraint(
-    #            fields=["product", "user"],
-    #           condition=Q(type="review"),
-    #          name="unique_review_per_product_per_user",
-    #     )
+        # constraints = [
+        #     models.UniqueConstraint(
+        #       fields=["product", "user"],
+        #     condition=Q(type="review"),
+        #   name="unique_review_per_product_per_user",
+        # )
+
     # ]
 
 

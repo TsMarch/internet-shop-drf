@@ -2,7 +2,7 @@ import json
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Prefetch
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -60,8 +60,7 @@ def delete_attribute(request):
     return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
 
 
-class ProductReviewTesting(GenericViewSet):
-    queryset = ProductReviewComment
+class ProductReviewCommentView(GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=["POST"])
@@ -78,6 +77,15 @@ class ProductReviewTesting(GenericViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=["POST"])
+    def create_comment(self, request):
+        user = self.request.user
+        product = Product.objects.filter(id=request.data.get("product_id"))
+        text = request.data.get("text")
+        parent = request.data.get("parent")
+        ProductReviewComment.objects.create(user=user, product=product, text=text, parent=parent)
+        return Response("comment successfully create", status=status.HTTP_200_OK)
 
 
 class ExternalOrderViewSet(GenericViewSet):
@@ -152,10 +160,15 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
     def get_queryset(self):
         if self.action == "list":
             return Product.objects.select_related("category").annotate(
-                average_rating=Avg("productreviewcomment__Rating"), rating_count=Count("productreviewcomment__Rating")
+                average_rating=Avg("reviews__rating"), rating_count=Count("reviews__rating")
             )
-
-        return Product.objects.all()
+        return Product.objects.prefetch_related(
+            Prefetch(
+                "reviews",
+                queryset=ProductReviewComment.objects.select_related("user").prefetch_related("comments"),
+                to_attr="prefetched_reviews",
+            )
+        )
 
     @staticmethod
     def attrs_handler(attrs, product_id):
