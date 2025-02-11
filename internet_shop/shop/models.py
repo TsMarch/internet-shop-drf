@@ -3,6 +3,8 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
 
+# from django.db.models import Q
+
 
 class ProductCategory(models.Model):
     name = models.CharField("Название категории", max_length=100, unique=True)
@@ -48,27 +50,6 @@ eav.register(Product)
 
 
 class ProductReviewComment(models.Model):
-    class NodeType(models.TextChoices):
-        REVIEW = "review"
-        COMMENT = "comment"
-        REPLY = "reply"
-
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews", null=True, blank=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    text = models.TextField("Текст", blank=False)
-    parent = models.ForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children")
-    type = models.CharField(max_length=10, choices=NodeType.choices, default=NodeType.REVIEW)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    rating = models.OneToOneField(
-        "ProductRating", on_delete=models.CASCADE, null=True, blank=True, related_name="review"
-    )
-
-    class Meta:
-        ordering = ["created_at"]
-
-
-class ProductRating(models.Model):
     class RatingChoices(models.IntegerChoices):
         ONE = 1
         TWO = 2
@@ -76,12 +57,35 @@ class ProductRating(models.Model):
         FOUR = 4
         FIVE = 5
 
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    class NodeType(models.TextChoices):
+        REVIEW = "review"
+        COMMENT = "comment"
+        REPLY = "reply"
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews", null=True, blank=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    rating = models.IntegerField(choices=RatingChoices.choices, verbose_name="Rating")
+    text = models.TextField("Текст", blank=True, null=True)
+    parent = models.ForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children")
+    type = models.CharField(max_length=10, choices=NodeType.choices, default=NodeType.REVIEW)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    rating = models.IntegerField(choices=RatingChoices.choices, verbose_name="Rating", null=True)
 
     class Meta:
-        unique_together = ("product", "user")
+        ordering = ["created_at"]
+
+    #       constraints = [
+    #         models.UniqueConstraint(
+    #            fields=["product", "user"],
+    #           condition=Q(type="review"),
+    #          name="unique_review_per_product_per_user",
+    #     )
+    # ]
+
+    def clean(self):
+        if self.type != ProductReviewComment.NodeType.REVIEW and self.rating is not None:
+            raise ValidationError("Только отзыв может содержать рейтинг")
+        super().clean()
 
 
 class Cart(models.Model):

@@ -15,7 +15,6 @@ from .models import (
     OrderItems,
     Product,
     ProductCategory,
-    ProductRating,
     ProductReviewComment,
     UserBalance,
     UserBalanceHistory,
@@ -43,20 +42,10 @@ class ProductReviewCreateService:
         if not Order.objects.filter(user=self.user, products=self.product).exists():
             return ValidationError({"error": "товар не приобретен"})
 
-    def get_rating(self, rating_value=None):
-        rating = ProductRating.objects.filter(user=self.user, product=self.product).first()
-
-        if not rating:
-            if rating_value is None:
-                raise ValidationError({"error": "необходимо указать рейтинг"})
-            rating = ProductRating.objects.create(user=self.user, product=self.product, rating=rating_value)
-        return rating
-
-    def create_review(self, text, rating_value):
+    def create_review(self, text):
         self.has_purchased_product()
-        rating = self.get_rating(rating_value)
         review = ProductReviewComment.objects.create(
-            product=self.product, user=self.user, text=text, type=ProductReviewComment.NodeType.REVIEW, rating=rating
+            product=self.product, user=self.user, text=text, type=ProductReviewComment.NodeType.REVIEW
         )
         return review
 

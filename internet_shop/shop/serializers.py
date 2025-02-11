@@ -10,7 +10,6 @@ from .models import (
     OrderItems,
     Product,
     ProductCategory,
-    ProductRating,
     ProductReviewComment,
     UserBalance,
     UserBalanceHistory,
@@ -63,7 +62,7 @@ class ProductListSerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(ProductListSerializer, DynamicFieldsModelSerializer):
-    comments = serializers.SerializerMethodField()
+    reviews_comments_replies = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -80,38 +79,29 @@ class ProductSerializer(ProductListSerializer, DynamicFieldsModelSerializer):
 
         return super().create(validated_data)
 
-    def get_comments(self, obj):
-        """Получаем только корневые отзывы (REVIEW) с привязкой к продукту"""
-        reviews = ProductReviewComment.objects.filter(product=obj, type=ProductReviewComment.NodeType.REVIEW)
-        return ProductReviewCommentSerializer(reviews, many=True).data
+    def get_reviews_comments_replies(self, obj):
+        reviews = ProductReviewComment.objects.filter(
+            product=obj, type=ProductReviewComment.NodeType.REVIEW
+        ).select_related("user")
+        comments = ProductReviewComment.objects.filter(
+            product=obj, type=ProductReviewComment.NodeType.COMMENT
+        ).select_related("user")
+        replies = ProductReviewComment.objects.filter(
+            product=obj, type=ProductReviewComment.NodeType.REPLY
+        ).select_related("user")
 
+        return self.build_comment_hierarchy(reviews, comments, replies)
 
-class ProductRatingSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProductRating
-        fields = "__all__"
+    def build_comment_hierarchy(self, reviews, comments, replies):
+        pass
 
 
 class ProductReviewCommentSerializer(serializers.ModelSerializer):
-    children = serializers.SerializerMethodField()
-    rating = serializers.SerializerMethodField()
+    rating = serializers.IntegerField()
 
     class Meta:
         model = ProductReviewComment
-        fields = ["id", "user", "text", "type", "created_at", "updated_at", "children", "rating"]
-
-    def get_children(self, obj):
-        """Рекурсивно получаем все дочерние комментарии и ответы"""
-        children = obj.children.all()
-        return ProductReviewCommentSerializer(children, many=True).data if children else []
-
-    def get_rating(self, obj):
-        """Возвращает рейтинг только для отзывов"""
-        return (
-            ProductRatingSerializer(obj.rating).data
-            if obj.type == ProductReviewComment.NodeType.REVIEW and obj.rating
-            else None
-        )
+        fields = ["id", "user", "text", "type", "created_at", "updated_at", "rating", "children"]
 
 
 class CartItemSerializer(serializers.ModelSerializer):

@@ -2,17 +2,12 @@ import json
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db.models import Avg, Count, Prefetch
+from django.db.models import Avg, Count
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action, api_view
-from rest_framework.mixins import (
-    CreateModelMixin,
-    ListModelMixin,
-    RetrieveModelMixin,
-    UpdateModelMixin,
-)
+from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -26,7 +21,6 @@ from .models import (
     Order,
     Product,
     ProductCategory,
-    ProductRating,
     ProductReviewComment,
     User,
     UserBalance,
@@ -38,7 +32,6 @@ from .serializers import (
     OrderDetailSerializer,
     OrderSerializer,
     ProductListSerializer,
-    ProductRatingSerializer,
     ProductReviewCommentSerializer,
     ProductSerializer,
     UserBalanceHistorySerializer,
@@ -67,35 +60,6 @@ def delete_attribute(request):
     return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
 
 
-class ProductRatingView(CreateModelMixin, UpdateModelMixin, GenericViewSet):
-    permission_classes = [IsAuthenticated]
-    serializer_class = ProductRatingSerializer
-    queryset = ProductRating.objects.all()
-
-    def create(self, request, *args, **kwargs):
-        user = request.user
-        product = request.data.get("product")
-        service = ProductReviewCreateService(product_id=product, user=user)
-        try:
-            service.has_purchased_product()
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-        return super().create(request, *args, **kwargs)
-
-    def update(self, request, *args, **kwargs):
-        product = request.data.get("product")
-
-        if not product:
-            product = self.kwargs.get("pk")
-            request.data["product"] = product
-
-        return super().update(request, *args, **kwargs)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-
 class ProductReviewTesting(GenericViewSet):
     queryset = ProductReviewComment
     permission_classes = [IsAuthenticated]
@@ -114,44 +78,6 @@ class ProductReviewTesting(GenericViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class ProductReviewView(CreateModelMixin, GenericViewSet):
-    permission_classes = [IsAuthenticated]
-    # serializer_class = ProductReviewSerializer
-    # queryset = ProductReview.objects.all()
-
-    def get_rating(self, user, product):
-        return ProductRating.objects.filter(user=user, product=product).first()
-
-    def create(self, request, *args, **kwargs):
-        user = request.user
-        product = request.data.get("product")
-
-        error = self.has_purchased_product(user, product)
-        if error:
-            return Response({"error": "товар не куплен"}, status=status.HTTP_400_BAD_REQUEST)
-
-        rating = self.get_rating(user, product)
-        if not rating:
-            rating_value = request.data.get("rating")
-            if not rating_value:
-                return Response(
-                    {"error": "Нельзя оставить отзыв без рейтинга"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            rating = ProductRating.objects.create(user=user, product=product, rating=rating_value)
-
-        request.data["rating"] = rating.id
-
-        return super().create(request, *args, **kwargs)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-    @action(methods=["POST"], detail=False)
-    def get_related_comments(self, request):
-        return Response("not ready", status=status.HTTP_400_BAD_REQUEST)
 
 
 class ExternalOrderViewSet(GenericViewSet):
@@ -226,23 +152,10 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
     def get_queryset(self):
         if self.action == "list":
             return Product.objects.select_related("category").annotate(
-                average_rating=Avg("productrating__rating"), rating_count=Count("productrating__rating")
+                average_rating=Avg("productreviewcomment__Rating"), rating_count=Count("productreviewcomment__Rating")
             )
-        return Product.objects.prefetch_related(
-            Prefetch(
-                "reviews",
-                queryset=ProductReviewComment.objects.filter(type=ProductReviewComment.NodeType.REVIEW)
-                .select_related("user", "rating")
-                .prefetch_related(
-                    Prefetch(
-                        "children",
-                        queryset=ProductReviewComment.objects.select_related("user").prefetch_related(
-                            Prefetch("children", queryset=ProductReviewComment.objects.select_related("user"))
-                        ),
-                    )
-                ),
-            )
-        )
+
+        return Product.objects.all()
 
     @staticmethod
     def attrs_handler(attrs, product_id):
