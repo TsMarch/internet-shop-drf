@@ -57,16 +57,10 @@ class ProductReviewComment(models.Model):
         FOUR = 4
         FIVE = 5
 
-    class NodeType(models.TextChoices):
-        REVIEW = "review"
-        COMMENT = "comment"
-        REPLY = "reply"
-
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews", null=True, blank=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     text = models.TextField("Текст", blank=True, null=True)
-    parent = models.ForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children")
-    type = models.CharField(max_length=10, choices=NodeType.choices, default=NodeType.REVIEW)
+    parent = models.ForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="comments")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     rating = models.IntegerField(choices=RatingChoices.choices, verbose_name="Rating", null=True)
@@ -81,11 +75,6 @@ class ProductReviewComment(models.Model):
     #          name="unique_review_per_product_per_user",
     #     )
     # ]
-
-    def clean(self):
-        if self.type != ProductReviewComment.NodeType.REVIEW and self.rating is not None:
-            raise ValidationError("Только отзыв может содержать рейтинг")
-        super().clean()
 
 
 class Cart(models.Model):
