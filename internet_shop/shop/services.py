@@ -15,7 +15,7 @@ from .models import (
     OrderItems,
     Product,
     ProductCategory,
-    ProductReviewComment,
+    ReviewComment,
     UserBalance,
     UserBalanceHistory,
 )
@@ -33,7 +33,7 @@ DATATYPE_MAP = {
 }
 
 
-class ProductReviewCreateService:
+class ReviewCreateService:
     def __init__(self, product_id, user):
         self.product = Product.objects.get(id=product_id)
         self.user = user
@@ -44,9 +44,7 @@ class ProductReviewCreateService:
 
     def get_rating(self):
         rating = (
-            ProductReviewComment.objects.filter(product=self.product, user=self.user)
-            .values_list("rating", flat=True)
-            .first()
+            ReviewComment.objects.filter(product=self.product, user=self.user).values_list("rating", flat=True).first()
         )
         return rating
 
@@ -54,9 +52,7 @@ class ProductReviewCreateService:
         self.has_purchased_product()
         if rating_value is None:
             rating_value = self.get_rating()
-        review = ProductReviewComment.objects.create(
-            product=self.product, user=self.user, text=text, rating=rating_value
-        )
+        review = ReviewComment.objects.create(product=self.product, user=self.user, text=text, rating=rating_value)
         return review
 
 

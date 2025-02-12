@@ -2,6 +2,7 @@ import eav
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
+from mptt.models import MPTTModel, TreeForeignKey
 
 
 class ProductCategory(models.Model):
@@ -47,7 +48,7 @@ class Product(models.Model):
 eav.register(Product)
 
 
-class ProductReviewComment(models.Model):
+class ReviewComment(MPTTModel):
     class RatingChoices(models.IntegerChoices):
         ONE = 1
         TWO = 2
@@ -55,16 +56,16 @@ class ProductReviewComment(models.Model):
         FOUR = 4
         FIVE = 5
 
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews", null=True, blank=True)
+    product = models.ForeignKey("Product", on_delete=models.CASCADE, related_name="reviews", null=True, blank=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     text = models.TextField("Текст", blank=True, null=True)
-    parent = models.ForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="comments")
+    parent = TreeForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     rating = models.IntegerField(choices=RatingChoices.choices, verbose_name="Rating", null=True)
 
-    class Meta:
-        ordering = ["created_at"]
+    class MPTTMeta:
+        order_insertion_by = ["created_at"]
 
         # constraints = [
         #     models.UniqueConstraint(

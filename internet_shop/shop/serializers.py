@@ -10,7 +10,7 @@ from .models import (
     OrderItems,
     Product,
     ProductCategory,
-    ProductReviewComment,
+    ReviewComment,
     UserBalance,
     UserBalanceHistory,
 )
@@ -61,15 +61,11 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class ProductReviewCommentSerializer(serializers.ModelSerializer):
-    replies = serializers.SerializerMethodField()
+class ReviewCommentSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = ProductReviewComment
-        fields = ("id", "user", "text", "rating", "created_at", "replies")
-
-    def get_replies(self, obj):
-        return ProductReviewCommentSerializer(getattr(obj, "replies_list", []), many=True).data
+        model = ReviewComment
+        fields = ["id", "text", "user", "rating", "created_at", "children"]
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -90,17 +86,8 @@ class ProductSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def get_reviews(self, obj):
-        comment_cache = {c.id: c for c in obj.prefetched_reviews}
-
-        for comment in comment_cache.values():
-            if comment.parent_id and comment.parent_id in comment_cache:
-                parent = comment_cache[comment.parent_id]
-                if not hasattr(parent, "replies_list"):
-                    parent.replies_list = []
-                parent.replies_list.append(comment)
-
-        root_comments = [c for c in comment_cache.values() if c.parent_id is None]
-        return ProductReviewCommentSerializer(root_comments, many=True).data
+        root_reviews = obj.reviews.filter(parent__isnull=True)
+        return ReviewCommentSerializer(root_reviews, many=True).data
 
 
 class CartItemSerializer(serializers.ModelSerializer):

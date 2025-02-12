@@ -21,7 +21,7 @@ from .models import (
     Order,
     Product,
     ProductCategory,
-    ProductReviewComment,
+    ReviewComment,
     User,
     UserBalance,
     UserBalanceHistory,
@@ -32,8 +32,8 @@ from .serializers import (
     OrderDetailSerializer,
     OrderSerializer,
     ProductListSerializer,
-    ProductReviewCommentSerializer,
     ProductSerializer,
+    ReviewCommentSerializer,
     UserBalanceHistorySerializer,
     UserBalanceSerializer,
     UserRegistrationSerializer,
@@ -47,8 +47,8 @@ from .services import (
     PaymentProcessor,
     ProductAttributeService,
     ProductFileService,
-    ProductReviewCreateService,
     ProductService,
+    ReviewCreateService,
 )
 
 
@@ -60,7 +60,7 @@ def delete_attribute(request):
     return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
 
 
-class ProductReviewCommentView(GenericViewSet):
+class ReviewCommentViewSet(GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=["POST"])
@@ -71,9 +71,9 @@ class ProductReviewCommentView(GenericViewSet):
         text = request.data.get("text")
 
         try:
-            service = ProductReviewCreateService(product_id=product_id, user=user)
+            service = ReviewCreateService(product_id=product_id, user=user)
             review = service.create_review(text, rating_value)
-            serializer = ProductReviewCommentSerializer(review)
+            serializer = ReviewCommentSerializer(review)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -84,7 +84,7 @@ class ProductReviewCommentView(GenericViewSet):
         product = Product.objects.filter(id=request.data.get("product_id"))
         text = request.data.get("text")
         parent = request.data.get("parent")
-        ProductReviewComment.objects.create(user=user, product=product, text=text, parent=parent)
+        ReviewComment.objects.create(user=user, product=product, text=text, parent=parent)
         return Response("comment successfully create", status=status.HTTP_200_OK)
 
 
@@ -162,11 +162,14 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
             return Product.objects.select_related("category").annotate(
                 average_rating=Avg("reviews__rating"), rating_count=Count("reviews__rating")
             )
+        parent_id = self.request.query_params.get("parent_id")
+
         return Product.objects.prefetch_related(
             Prefetch(
                 "reviews",
-                queryset=ProductReviewComment.objects.select_related("user").prefetch_related("comments"),
-                to_attr="prefetched_reviews",
+                queryset=ReviewComment.objects.filter(parent__isnull=True)
+                .select_related("user")
+                .prefetch_related(Prefetch("children", queryset=ReviewComment.objects.filter(parent=parent_id))),
             )
         )
 
