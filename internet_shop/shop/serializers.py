@@ -61,15 +61,26 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class ReviewCommentSerializer(serializers.ModelSerializer):
+class RootReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReviewComment
         fields = ["id", "text", "user", "rating", "created_at", "children"]
 
 
+class NestedReviewSerializer(serializers.ModelSerializer):
+    children = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ReviewComment
+        fields = ["id", "user", "text", "created_at", "children"]
+
+    def get_children(self, obj):
+        return NestedReviewSerializer(obj.children.all(), many=True).data
+
+
 class ProductSerializer(serializers.ModelSerializer):
-    reviews = serializers.SerializerMethodField()
+    reviews = RootReviewSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
@@ -84,10 +95,6 @@ class ProductSerializer(serializers.ModelSerializer):
             case _:
                 validated_data["price"] = None
         return super().create(validated_data)
-
-    def get_reviews(self, obj):
-        root_reviews = obj.reviews.filter(parent__isnull=True)
-        return ReviewCommentSerializer(root_reviews, many=True).data
 
 
 class CartItemSerializer(serializers.ModelSerializer):

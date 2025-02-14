@@ -1,7 +1,9 @@
 import json
+import logging
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
+from django.db import connection
 from django.db.models import Avg, Count, Prefetch
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -26,14 +28,16 @@ from .models import (
     UserBalance,
     UserBalanceHistory,
 )
+from .pagination import NestedReviewPagination, ReviewPagination
 from .serializers import (
     CartSerializer,
     CategorySerializer,
+    NestedReviewSerializer,
     OrderDetailSerializer,
     OrderSerializer,
     ProductListSerializer,
     ProductSerializer,
-    ReviewCommentSerializer,
+    RootReviewSerializer,
     UserBalanceHistorySerializer,
     UserBalanceSerializer,
     UserRegistrationSerializer,
@@ -50,6 +54,8 @@ from .services import (
     ProductService,
     ReviewCreateService,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @api_view(["POST"])
@@ -73,7 +79,7 @@ class ReviewCommentViewSet(GenericViewSet):
         try:
             service = ReviewCreateService(product_id=product_id, user=user)
             review = service.create_review(text, rating_value)
-            serializer = ReviewCommentSerializer(review)
+            serializer = RootReviewSerializer(review)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -148,7 +154,7 @@ class ProductCategoryViewSet(CreateModelMixin, GenericViewSet):
     serializer_class = CategorySerializer
 
 
-class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListModelMixin, GenericViewSet):
+class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, GenericViewSet):
     serializer_class = ProductSerializer
     filter_backends = [ProductFilter, DjangoFilterBackend]
     serializer_action_classes = {
@@ -156,22 +162,46 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
         "create": ProductSerializer,
         "retrieve": ProductSerializer,
     }
+    pagination_class = [ReviewPagination, NestedReviewPagination]
+
+    def get_object(self):
+        product = Product.objects.prefetch_related(
+            Prefetch(
+                "reviews",
+                queryset=ReviewComment.objects.filter(parent__isnull=True)
+                .order_by("created_at")
+                .select_related("user"),
+            ),
+            Prefetch("reviews__children", queryset=ReviewComment.objects.select_related("user")),
+        ).get(id=self.kwargs["pk"])
+        return product
+
+    def retrieve(self, request, *args, **kwargs):
+        product = self.get_object()
+        queryset = (
+            product.reviews.filter(parent__isnull=True)
+            .select_related("user")
+            .prefetch_related(Prefetch("children", queryset=ReviewComment.objects.select_related("user")))
+            .order_by("created_at")
+        )
+        paginator = self.pagination_class[0]()
+        page = paginator.paginate_queryset(queryset, request)
+        if page is not None:
+            reviews_data = RootReviewSerializer(page, many=True).data
+            reviews_paginated = paginator.get_paginated_response(reviews_data).data
+        else:
+            reviews_paginated = RootReviewSerializer(queryset, many=True).data
+        product_data = ProductSerializer(product).data
+        product_data["reviews"] = reviews_paginated
+
+        return Response(product_data, status=status.HTTP_200_OK)
 
     def get_queryset(self):
         if self.action == "list":
             return Product.objects.select_related("category").annotate(
                 average_rating=Avg("reviews__rating"), rating_count=Count("reviews__rating")
             )
-        parent_id = self.request.query_params.get("parent_id")
-
-        return Product.objects.prefetch_related(
-            Prefetch(
-                "reviews",
-                queryset=ReviewComment.objects.filter(parent__isnull=True)
-                .select_related("user")
-                .prefetch_related(Prefetch("children", queryset=ReviewComment.objects.filter(parent=parent_id))),
-            )
-        )
+        return Product.objects.all()
 
     @staticmethod
     def attrs_handler(attrs, product_id):
@@ -179,6 +209,35 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
         product = ProductAttributeService(product_id=product_id, attributes=attrs)
         product = product.attach_attribute()
         return product
+
+    @action(methods=["GET"], detail=True, url_path="comments/(?P<comment_id>\\d+)")
+    def get_nested_comments(self, request, pk=None, comment_id=None):
+        try:
+            #            comment = ReviewComment.objects.get(id=comment_id, product_id=pk)
+
+            nested_comments = (
+                ReviewComment.objects.filter(parent_id=comment_id, product_id=pk)
+                .select_related("user")
+                .prefetch_related("children__user")
+                .order_by("created_at")
+            )
+
+            paginator = self.pagination_class[1]()
+            page = paginator.paginate_queryset(nested_comments, request)
+
+            if page is not None:
+                serializer = NestedReviewSerializer(page, many=True)
+                return paginator.get_paginated_response(serializer.data)
+
+            serializer = NestedReviewSerializer(nested_comments, many=True)
+
+            for query in connection.queries[-10:]:
+                logger.info(query["sql"])
+
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except ReviewComment.DoesNotExist:
+            return Response({"error": "no such comment"}, status=status.HTTP_404_NOT_FOUND)
 
     @action(methods=["POST"], detail=False, parser_classes=[MultiPartParser, FormParser])
     def upload_products_file(self, request):
@@ -191,7 +250,7 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
     def attach_attribute(self, request):
         attrs = json.loads(request.data.get("attributes", []))
         product = self.attrs_handler(attrs, request.data.get("product_id"))
-        return Response(ProductSerializer(product).data, status=status.HTTP_200_OK)
+        return Response(self.serializer_class(product).data, status=status.HTTP_200_OK)
 
     @action(methods=["POST"], detail=False)
     def create_with_attributes(self, request):
@@ -211,7 +270,7 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
             product_id=request.data.get("product_id"), field=request.data.get("field_name")
         )
         updated_product = product_service.update_field(request.data.get("field_value"))
-        return Response(ProductSerializer(updated_product).data, status=status.HTTP_200_OK)
+        return Response(self.serializer_class(updated_product).data, status=status.HTTP_200_OK)
 
     @action(methods=["GET"], detail=False)
     def update_price(self, request):

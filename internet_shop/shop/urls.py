@@ -32,6 +32,11 @@ review_comment_router.register(r"", ReviewCommentViewSet, basename="reviews-comm
 
 urlpatterns = [
     path("product/", include(shop_router.urls)),
+    path(
+        "product/<int:pk>/comments/<int:comment_id>/",
+        ProductViewSet.as_view({"get": "comments"}),
+        name="product-comments",
+    ),
     path("product_category/", include(category_router.urls)),
     path("cart/", include(cart_router.urls)),
     path("orders/", include(order_router.urls)),
