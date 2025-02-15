@@ -39,7 +39,7 @@ class Command(BaseCommand):
 
         comments = []
         for review in reviews:
-            for _ in range(10):
+            for _ in range(20):
                 comment = ReviewComment.objects.create(
                     product=review.product,
                     user=superuser,
@@ -49,7 +49,7 @@ class Command(BaseCommand):
                 comments.append(comment)
 
         for comment in comments:
-            for _ in range(10):
+            for _ in range(20):
                 ReviewComment.objects.create(
                     product=comment.product,
                     user=superuser,

@@ -73,10 +73,12 @@ class NestedReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReviewComment
-        fields = ["id", "user", "text", "created_at", "children"]
+        fields = ["id", "user", "text", "created_at", "updated_at", "rating", "children"]
 
     def get_children(self, obj):
-        return NestedReviewSerializer(obj.children.all(), many=True).data
+        children_attr = self.context.get("children_attr", "children_list")
+        children = getattr(obj, children_attr, [])
+        return NestedReviewSerializer(children, many=True, context=self.context).data if children else []
 
 
 class ProductSerializer(serializers.ModelSerializer):

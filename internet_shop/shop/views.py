@@ -3,7 +3,6 @@ import logging
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db import connection
 from django.db.models import Avg, Count, Prefetch
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -213,26 +212,25 @@ class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, Gener
     @action(methods=["GET"], detail=True, url_path="comments/(?P<comment_id>\\d+)")
     def get_nested_comments(self, request, pk=None, comment_id=None):
         try:
-            #            comment = ReviewComment.objects.get(id=comment_id, product_id=pk)
+            root_comment = ReviewComment.objects.get(id=comment_id, product_id=pk)
 
             nested_comments = (
-                ReviewComment.objects.filter(parent_id=comment_id, product_id=pk)
-                .select_related("user")
-                .prefetch_related("children__user")
-                .order_by("created_at")
+                root_comment.get_descendants(include_self=True).select_related("user").order_by("tree_id", "lft")
             )
 
-            paginator = self.pagination_class[1]()
-            page = paginator.paginate_queryset(nested_comments, request)
+            comments_dict = {comment.id: comment for comment in nested_comments}
 
-            if page is not None:
-                serializer = NestedReviewSerializer(page, many=True)
-                return paginator.get_paginated_response(serializer.data)
+            for comment in comments_dict.values():
+                setattr(comment, "children_list", [])
 
-            serializer = NestedReviewSerializer(nested_comments, many=True)
+            tree = []
+            for comment in nested_comments:
+                if comment.parent_id:
+                    comments_dict[comment.parent_id].children_list.append(comment)
+                else:
+                    tree.append(comment)
 
-            for query in connection.queries[-10:]:
-                logger.info(query["sql"])
+            serializer = NestedReviewSerializer(tree, many=True, context={"children_attr": "children_list"})
 
             return Response(serializer.data, status=status.HTTP_200_OK)
 
