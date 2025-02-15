@@ -1,61 +1,58 @@
 import random
+from decimal import Decimal
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from shop.models import (
-    Product,
-    ProductCategory,
-    ProductRating,
-    ProductReview,
-    ReviewComment,
-    ReviewCommentReply,
-    User,
-)
+from shop.models import Product, ProductCategory, ReviewComment, User
 
 
 class Command(BaseCommand):
-    help = "Генерирует тестовые данные: категория, продукты, отзывы, комментарии и ответы"
+    help = "Generate test data for products and reviews"
 
     @transaction.atomic
     def handle(self, *args, **kwargs):
-        category = ProductCategory.objects.create(name="tv")
+        superuser = User.objects.first()
+        category = ProductCategory.objects.create(name="TV")
 
-        for i in range(10):
-            old_price = random.randint(100, 5000)
-            discount = random.randint(0, 50)
-            price = old_price * (1 - discount / 100)
-            available_quantity = random.randint(0, 100)
-
+        products = [
             Product.objects.create(
                 category=category,
                 name=f"Product {i + 1}",
                 description=f"Description {i + 1}",
-                old_price=old_price,
-                discount=discount,
-                price=price,
-                available_quantity=available_quantity,
+                old_price=(old_price := random.randint(100, 5000)),
+                discount=(discount := random.randint(0, 50)),
+                price=Decimal(old_price - old_price * discount / 100),
+                available_quantity=random.randint(0, 100),
             )
-        user = User.objects.first()
-        products = list(Product.objects.all())
+            for i in range(10)
+        ]
 
-        for _ in range(20):
-            product = random.choice(products)
-
-            rating, created = ProductRating.objects.get_or_create(
-                user=user, product=product, defaults={"rating": random.randint(1, 5)}
+        reviews = [
+            ReviewComment.objects.create(
+                product=random.choice(products),
+                user=superuser,
+                text=f"Отзыв {random.randint(1, 1000)}",
+                rating=random.randint(1, 5),
             )
+            for _ in range(50)
+        ]
 
-            if not ProductReview.objects.filter(rating=rating).exists():
-                review = ProductReview.objects.create(
-                    product=product, user=user, text=f"Отзыв {random.randint(1, 1000)}", rating=rating
+        comments = []
+        for review in reviews:
+            for _ in range(20):
+                comment = ReviewComment.objects.create(
+                    product=review.product,
+                    user=superuser,
+                    text=f"Комментарий на отзыв {review.id}",
+                    parent=review,
                 )
+                comments.append(comment)
 
-                for _ in range(3):
-                    comment = ReviewComment.objects.create(
-                        review=review, user=user, text=f"Комментарий на отзыв {review.id}"
-                    )
-
-                    for _ in range(5):
-                        ReviewCommentReply.objects.create(
-                            review_comment=comment, user=user, text=f"Ответ на комментарий {comment.id}"
-                        )
+        for comment in comments:
+            for _ in range(20):
+                ReviewComment.objects.create(
+                    product=comment.product,
+                    user=superuser,
+                    text=f"Ответ на комментарий {comment.id}",
+                    parent=comment,
+                )

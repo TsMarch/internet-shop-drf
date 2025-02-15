@@ -2,6 +2,7 @@ import eav
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
+from mptt.models import MPTTModel, TreeForeignKey
 
 
 class ProductCategory(models.Model):
@@ -47,18 +48,7 @@ class Product(models.Model):
 eav.register(Product)
 
 
-class ProductReview(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="reviews")
-    text = models.TextField("Отзыв", blank=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    rating = models.OneToOneField(
-        "ProductRating", on_delete=models.CASCADE, null=True, blank=True, related_name="comment"
-    )
-
-
-class ProductRating(models.Model):
+class ReviewComment(MPTTModel):
     class RatingChoices(models.IntegerChoices):
         ONE = 1
         TWO = 2
@@ -66,34 +56,25 @@ class ProductRating(models.Model):
         FOUR = 4
         FIVE = 5
 
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    product = models.ForeignKey("Product", on_delete=models.CASCADE, related_name="reviews", null=True, blank=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    rating = models.IntegerField(choices=RatingChoices.choices, verbose_name="Rating")
-
-    class Meta:
-        unique_together = ("product", "user")
-
-
-class ReviewComment(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    review = models.ForeignKey(ProductReview, on_delete=models.CASCADE, related_name="comments")
-    text = models.TextField("Комментарий", blank=False)
+    text = models.TextField("Текст", blank=True, null=True)
+    parent = TreeForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    rating = models.IntegerField(choices=RatingChoices.choices, verbose_name="Rating", null=True)
 
-    class Meta:
-        ordering = ["created_at"]
+    class MPTTMeta:
+        order_insertion_by = ["created_at"]
 
+        # constraints = [
+        #     models.UniqueConstraint(
+        #       fields=["product", "user"],
+        #     condition=Q(type="review"),
+        #   name="unique_review_per_product_per_user",
+        # )
 
-class ReviewCommentReply(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    review_comment = models.ForeignKey(ReviewComment, on_delete=models.CASCADE, related_name="replies")
-    text = models.TextField("Текст ответа", blank=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ["created_at"]
+    # ]
 
 
 class Cart(models.Model):

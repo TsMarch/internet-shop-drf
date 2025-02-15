@@ -6,11 +6,8 @@ from .views import (
     ExternalOrderViewSet,
     OrderViewSet,
     ProductCategoryViewSet,
-    ProductRatingView,
-    ProductReviewView,
     ProductViewSet,
-    ReviewCommentReplyView,
-    ReviewCommentView,
+    ReviewCommentViewSet,
     UserBalanceViewSet,
     UserRegistrationViewSet,
     delete_attribute,
@@ -30,18 +27,16 @@ user_balance_router = routers.DefaultRouter()
 user_balance_router.register(r"", UserBalanceViewSet, basename="balance")
 external_order_router = routers.DefaultRouter()
 external_order_router.register(r"", ExternalOrderViewSet, basename="external-orders")
-product_comment_router = routers.DefaultRouter()
-product_comment_router.register(r"", ProductReviewView, basename="product-comment")
-product_rating_router = routers.DefaultRouter()
-product_rating_router.register(r"", ProductRatingView, basename="product-rating"),
-review_comment_view = routers.DefaultRouter()
-review_comment_view.register(r"", ReviewCommentView)
-review_comment_reply_view = routers.DefaultRouter()
-review_comment_reply_view.register(r"", ReviewCommentReplyView)
-
+review_comment_router = routers.DefaultRouter()
+review_comment_router.register(r"", ReviewCommentViewSet, basename="reviews-comments")
 
 urlpatterns = [
     path("product/", include(shop_router.urls)),
+    path(
+        "product/<int:pk>/comments/<int:comment_id>/",
+        ProductViewSet.as_view({"get": "comments"}),
+        name="product-comments",
+    ),
     path("product_category/", include(category_router.urls)),
     path("cart/", include(cart_router.urls)),
     path("orders/", include(order_router.urls)),
@@ -49,8 +44,5 @@ urlpatterns = [
     path("balance/", include(user_balance_router.urls)),
     path("external/", include(external_order_router.urls)),
     path("delete_attribute/", delete_attribute),
-    path("product-comment/", include(product_comment_router.urls)),
-    path("product-rating/", include(product_rating_router.urls)),
-    path("review-comment/", include(review_comment_view.urls)),
-    path("review-comment-reply/", include(review_comment_reply_view.urls)),
+    path("review-comment/", include(review_comment_router.urls)),
 ]
