@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from typing import List
 
 from django.db import transaction
@@ -5,7 +6,13 @@ from django.db import transaction
 from internet_shop.shop.models import Product
 
 
-class ProductRepository:
+class ProductRepositoryInterface(ABC):
+    @abstractmethod
+    def bulk_insert(self, products: List[Product]):
+        pass
+
+
+class ProductRepository(ProductRepositoryInterface):
     @staticmethod
     @transaction.atomic
     def bulk_insert(products: List[Product]):

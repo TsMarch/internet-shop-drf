@@ -28,6 +28,7 @@ from .models import (
     UserBalanceHistory,
 )
 from .pagination import NestedReviewPagination, ReviewPagination
+from .repository import ProductRepository
 from .serializers import (
     CartSerializer,
     CategorySerializer,
@@ -245,7 +246,10 @@ class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, Gener
             return Response({"error": "Файл не загружен"}, status=status.HTTP_400_BAD_REQUEST)
         try:
             file_processor = FileProcessorFactory.get_processor(file.name)
-            product_processor = ProductFileProcessor(file_processor)
+            product_repository = ProductRepository()
+            product_processor = ProductFileProcessor(
+                file_processor=file_processor, product_repository=product_repository
+            )
             product_processor.load_data(file)
             product_processor.create_products()
             return Response("new products created", status=status.HTTP_200_OK)
