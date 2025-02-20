@@ -19,7 +19,6 @@ from .models import (
     UserBalance,
     UserBalanceHistory,
 )
-from .repository import ProductRepositoryInterface
 
 DATATYPE_MAP = {
     "int": Attribute.TYPE_INT,
@@ -140,16 +139,15 @@ class FileProcessorFactory:
 
 
 class ProductFileProcessor:
-    def __init__(self, file_processor: FileProcessor, product_repository: ProductRepositoryInterface):
+    def __init__(self, file_processor: FileProcessor):
         self.file_processor = file_processor
         self.data = None
         self.category_cache = {}
-        self.product_repository = product_repository
 
     def create_products(self):
         self._prepare_categories()
         products = self._prepare_products()
-        self.product_repository.bulk_insert(products)
+        Product.objects.bulk_create(products)
 
     def load_data(self, file) -> None:
         self.data = self.file_processor.process(file)
