@@ -245,8 +245,7 @@ class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, Gener
             return Response({"error": "Файл не загружен"}, status=status.HTTP_400_BAD_REQUEST)
         try:
             file_processor = FileProcessorFactory.get_processor(file.name)
-            product_processor = ProductFileProcessor(file_processor=file_processor)
-            product_processor.load_data(file)
+            product_processor = ProductFileProcessor(file_processor=file_processor, file=file)
             product_processor.create_products()
             return Response("new products created", status=status.HTTP_200_OK)
         except ValueError as e:

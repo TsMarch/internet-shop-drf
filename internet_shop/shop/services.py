@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, Literal
 
 import pandas as pd
+from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 from eav.models import Attribute, Value
 from rest_framework.exceptions import ValidationError
@@ -33,11 +34,10 @@ DATATYPE_MAP = {
 }
 
 
-class ReviewValidator:
+class ReviewService:
     @staticmethod
-    def validate_purchase(user, product):
-        if not Order.objects.filter(user=user, products=product).exists():
-            return ValidationError({"error": "товар не приобретен"})
+    def get_existing_rating(product, user):
+        return ReviewComment.objects.filter(product=product, user=user).values_list("rating", flat=True).first()
 
 
 class ReviewCreateService:
@@ -46,14 +46,13 @@ class ReviewCreateService:
         self.user = user
 
     def create_review(self, text, rating_value):
-        ReviewValidator.validate_purchase(self.user, self.product)
-        rating_value = rating_value or self.get_existing_rating()
+        self.validate_purchase()
+        rating_value = rating_value or ReviewService.get_existing_rating(product=self.product, user=self.user)
         return ReviewComment.objects.create(product=self.product, user=self.user, text=text, rating=rating_value)
 
-    def get_existing_rating(self):
-        return (
-            ReviewComment.objects.filter(product=self.product, user=self.user).values_list("rating", flat=True).first()
-        )
+    def validate_purchase(self):
+        if not Order.objects.filter(user=self.user, products=self.product).exists():
+            return ValidationError({"error": "товар не приобретен"})
 
 
 class ProductAttributeService:
@@ -139,17 +138,19 @@ class FileProcessorFactory:
 
 
 class ProductFileProcessor:
-    def __init__(self, file_processor: FileProcessor):
+    def __init__(self, file_processor: FileProcessor, file: UploadedFile):
         self.file_processor = file_processor
         self.data = None
         self.category_cache = {}
+        self.file = file
 
     def create_products(self):
         self._prepare_categories()
         products = self._prepare_products()
+        self._load_data(self.file)
         Product.objects.bulk_create(products)
 
-    def load_data(self, file) -> None:
+    def _load_data(self, file) -> None:
         self.data = self.file_processor.process(file)
 
     def _prepare_categories(self):
