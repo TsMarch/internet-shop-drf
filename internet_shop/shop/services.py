@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Literal
+from pathlib import Path
+from typing import Dict, Literal
 
 import pandas as pd
 from django.core.files.uploadedfile import UploadedFile
@@ -33,27 +34,25 @@ DATATYPE_MAP = {
 }
 
 
+class ReviewService:
+    @staticmethod
+    def get_existing_rating(product, user):
+        return ReviewComment.objects.filter(product=product, user=user).values_list("rating", flat=True).first()
+
+
 class ReviewCreateService:
     def __init__(self, product_id, user):
         self.product = Product.objects.get(id=product_id)
         self.user = user
 
-    def has_purchased_product(self):
+    def create_review(self, text, rating_value):
+        self.validate_purchase()
+        rating_value = rating_value or ReviewService.get_existing_rating(product=self.product, user=self.user)
+        return ReviewComment.objects.create(product=self.product, user=self.user, text=text, rating=rating_value)
+
+    def validate_purchase(self):
         if not Order.objects.filter(user=self.user, products=self.product).exists():
             return ValidationError({"error": "товар не приобретен"})
-
-    def get_rating(self):
-        rating = (
-            ReviewComment.objects.filter(product=self.product, user=self.user).values_list("rating", flat=True).first()
-        )
-        return rating
-
-    def create_review(self, text, rating_value):
-        self.has_purchased_product()
-        if rating_value is None:
-            rating_value = self.get_rating()
-        review = ReviewComment.objects.create(product=self.product, user=self.user, text=text, rating=rating_value)
-        return review
 
 
 class ProductAttributeService:
@@ -89,56 +88,105 @@ class AttributeService:
         Value.objects.filter(entity_id=product_id, attribute__name=attribute_name).delete()
 
 
-class UserBalanceProcessorInterface(ABC):
+class BalanceProcessor(ABC):
     @abstractmethod
     def create_balance_history(self, user_id, amount):
         pass
 
 
-class PaymentProcessor(UserBalanceProcessorInterface):
+class PaymentProcessor(BalanceProcessor):
     def create_balance_history(self, user_id, amount):
         UserBalanceHistory.objects.create(
             user=user_id, operation_type=UserBalanceHistory.OperationType.PAYMENT, amount=amount
         )
 
 
-class DepositProcessor(UserBalanceProcessorInterface):
+class DepositProcessor(BalanceProcessor):
     def create_balance_history(self, user_id, amount):
         UserBalanceHistory.objects.create(
             user=user_id, operation_type=UserBalanceHistory.OperationType.DEPOSIT, amount=amount
         )
 
 
-class ProductFileService:
-    def __init__(self, data: UploadedFile):
-        self.data = pd.read_excel(data).to_dict(orient="records")
+class FileProcessor(ABC):
+    @abstractmethod
+    def process(self, file):
+        pass
+
+
+class CsvFileProcessor(FileProcessor):
+    def process(self, file):
+        data = pd.read_csv(file).to_dict(orient="records")
+        return data
+
+
+class ExcelFileProcessor(FileProcessor):
+    def process(self, file):
+        data = pd.read_excel(file).to_dict(orient="records")
+        return data
+
+
+class FileProcessorFactory:
+    PROCESSORS = {".csv": CsvFileProcessor(), ".xlsx": ExcelFileProcessor(), ".xls": ExcelFileProcessor()}
+
+    @classmethod
+    def get_processor(cls, filename: str) -> FileProcessor:
+        extension = Path(filename).suffix.lower()
+        if extension not in cls.PROCESSORS:
+            raise ValueError("неподдерживаемый файл")
+        return cls.PROCESSORS[extension]
+
+
+class ProductFileProcessor:
+    def __init__(self, file_processor: FileProcessor, file: UploadedFile):
+        self.file_processor = file_processor
+        self.data = None
+        self.category_cache = {}
+        self.file = file
 
     def create_products(self):
+        self._prepare_categories()
+        products = self._prepare_products()
+        self._load_data(self.file)
+        Product.objects.bulk_create(products)
+
+    def _load_data(self, file) -> None:
+        self.data = self.file_processor.process(file)
+
+    def _prepare_categories(self):
         category_names = {product.get("category") for product in self.data}
         categories = ProductCategory.objects.filter(name__in=category_names)
-        category_cache = {category.name: category for category in categories}
+        self.category_cache = {category.name: category for category in categories}
+
+    def _prepare_products(self):
+
+        if self.data is None:
+            raise ValueError("load_data не вызывался")
+
         products = []
 
         for product in self.data:
-            category = category_cache.get(product.get("category"))
-            old_price = product.get("price")
-            discount = product.get("discount")
-            if old_price is not None and discount is not None:
-                product["price"] = Decimal(old_price - old_price * discount / 100)
-            else:
-                product["price"] = None
+            category = self.category_cache.get(product.get("category"))
             products.append(
                 Product(
                     name=product.get("name"),
-                    old_price=old_price,
+                    old_price=product.get("old_price"),
                     available_quantity=product.get("available_quantity"),
                     category=category,
-                    description=product.get("description", "default"),
-                    discount=discount,
-                    price=product["price"],
+                    description=product.get("description"),
+                    discount=product.get("discount"),
+                    price=self._calculate_price(product),
                 )
             )
-        Product.objects.bulk_create(products)
+        return products
+
+    @staticmethod
+    def _calculate_price(product: Dict) -> Decimal:
+        old_price = product.get("price")
+        discount = product.get("discount", 0)
+        if old_price and discount:
+            return Decimal(old_price) * (1 - Decimal(discount) / 100)
+        return old_price
 
 
 class ProductService:
@@ -229,7 +277,7 @@ class CartItemsService:
 
 
 class OrderService:
-    def __init__(self, user, payment_processor: UserBalanceProcessorInterface):
+    def __init__(self, user, payment_processor: BalanceProcessor):
         self.user = user
         self.payment_processor = payment_processor
         self.order = Order.objects.create(user=self.user)

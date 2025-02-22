@@ -46,10 +46,11 @@ from .services import (
     CartItemsService,
     DepositProcessor,
     ExternalOrderItemsService,
+    FileProcessorFactory,
     OrderService,
     PaymentProcessor,
     ProductAttributeService,
-    ProductFileService,
+    ProductFileProcessor,
     ProductService,
     ReviewCreateService,
 )
@@ -240,9 +241,15 @@ class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, Gener
     @action(methods=["POST"], detail=False, parser_classes=[MultiPartParser, FormParser])
     def upload_products_file(self, request):
         file = request.FILES.get("file")
-        products = ProductFileService(file)
-        products.create_products()
-        return Response("new products created", status=status.HTTP_200_OK)
+        if not file:
+            return Response({"error": "Файл не загружен"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            file_processor = FileProcessorFactory.get_processor(file.name)
+            product_processor = ProductFileProcessor(file_processor=file_processor, file=file)
+            product_processor.create_products()
+            return Response("new products created", status=status.HTTP_200_OK)
+        except ValueError as e:
+            return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=["POST"], detail=False)
     def attach_attribute(self, request):
