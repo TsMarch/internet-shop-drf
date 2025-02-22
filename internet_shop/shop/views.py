@@ -149,9 +149,12 @@ class UserRegistrationViewSet(CreateModelMixin, GenericViewSet):
     }
 
 
-class ProductCategoryViewSet(CreateModelMixin, GenericViewSet):
+class ProductCategoryViewSet(CreateModelMixin, GenericViewSet, RetrieveModelMixin):
     queryset = ProductCategory.objects.all()
     serializer_class = CategorySerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        pass
 
 
 class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, GenericViewSet):
@@ -209,6 +212,11 @@ class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, Gener
         product = ProductAttributeService(product_id=product_id, attributes=attrs)
         product = product.attach_attribute()
         return product
+
+    @action(methods=["GET"], detail=True, url_path="category/?P<category_id>\\d+")
+    def filter_by_category(self, request, pk=None, category_id=None):
+        # root_category = ProductCategory.objects.get(id=category_id)
+        pass
 
     @action(methods=["GET"], detail=True, url_path="comments/(?P<comment_id>\\d+)")
     def get_nested_comments(self, request, pk=None, comment_id=None):

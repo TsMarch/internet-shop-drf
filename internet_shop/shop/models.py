@@ -5,8 +5,9 @@ from django.db import models
 from mptt.models import MPTTModel, TreeForeignKey
 
 
-class ProductCategory(models.Model):
-    name = models.CharField("Название категории", max_length=100, unique=True)
+class ProductCategory(MPTTModel):
+    name = models.TextField("Название категории", unique=True)
+    parent = TreeForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children")
 
     class Meta:
         verbose_name_plural = "Категории товаров"
