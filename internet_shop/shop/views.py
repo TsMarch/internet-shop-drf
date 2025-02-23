@@ -213,12 +213,18 @@ class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, Gener
         product = product.attach_attribute()
         return product
 
-    @action(methods=["GET"], detail=True, url_path="category/?P<category_id>\\d+")
-    def filter_by_category(self, request, pk=None, category_id=None):
+    @action(methods=["GET"], detail=False, url_path="category/(?P<category_id>\\d+)")
+    def filter_by_category(self, request, category_id=None):
         root_category = ProductCategory.objects.get(id=category_id)
         descendants = root_category.get_descendants(include_self=True)
-        products = self.get_queryset().filter(category__in=descendants).distinct()
-        return Response((self.get_serializer(products)).data, status=status.HTTP_200_OK)
+        products = (
+            self.get_queryset()
+            .filter(category__in=descendants)
+            .select_related("category")
+            .prefetch_related("eav_values__attribute")
+        )
+        serialized_products = ProductSerializer(products, many=True).data
+        return Response(serialized_products, status=status.HTTP_200_OK)
 
     @action(methods=["GET"], detail=True, url_path="comments/(?P<comment_id>\\d+)")
     def get_nested_comments(self, request, pk=None, comment_id=None):

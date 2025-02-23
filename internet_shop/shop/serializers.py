@@ -31,7 +31,6 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
 
 
 class CategorySerializer(serializers.ModelSerializer):
-
     class Meta:
         model = ProductCategory
         fields = "__all__"
@@ -82,11 +81,11 @@ class NestedReviewSerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    reviews = RootReviewSerializer(many=True, read_only=True)
+    # attributes = serializers.DictField(source="eav.get_values_dict", read_only=True)
 
     class Meta:
         model = Product
-        fields = ("id", "name", "description", "price", "reviews")
+        fields = ["id", "name", "description", "price"]
 
     def create(self, validated_data):
         old_price = validated_data.get("old_price")
