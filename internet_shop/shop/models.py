@@ -9,8 +9,8 @@ class ProductCategory(MPTTModel):
     name = models.TextField("Название категории", unique=True)
     parent = TreeForeignKey("self", on_delete=models.CASCADE, null=True, blank=True, related_name="children")
 
-    class Meta:
-        verbose_name_plural = "Категории товаров"
+    class MPTTMeta:
+        order_insertion_by = ["name"]
 
     def __str__(self):
         return f"{self.name}"
