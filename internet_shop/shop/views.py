@@ -157,7 +157,7 @@ class ProductCategoryViewSet(CreateModelMixin, GenericViewSet, RetrieveModelMixi
         pass
 
 
-class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, GenericViewSet):
+class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListModelMixin, GenericViewSet):
     serializer_class = ProductListSerializer
     filter_backends = [ProductFilter, DjangoFilterBackend]
     serializer_action_classes = {
