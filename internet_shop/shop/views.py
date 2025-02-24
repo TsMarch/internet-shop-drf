@@ -27,7 +27,7 @@ from .models import (
     UserBalance,
     UserBalanceHistory,
 )
-from .pagination import NestedReviewPagination, ReviewPagination
+from .pagination import ReviewPagination
 from .serializers import (
     CartSerializer,
     CategorySerializer,
@@ -155,14 +155,14 @@ class ProductCategoryViewSet(CreateModelMixin, GenericViewSet):
 
 
 class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, GenericViewSet):
-    serializer_class = ProductSerializer
+    serializer_class = ProductListSerializer
     filter_backends = [ProductFilter, DjangoFilterBackend]
     serializer_action_classes = {
         "list": ProductListSerializer,
         "create": ProductSerializer,
         "retrieve": ProductSerializer,
     }
-    pagination_class = [ReviewPagination, NestedReviewPagination]
+    pagination_class = ReviewPagination
 
     def get_object(self):
         product = Product.objects.prefetch_related(
@@ -184,7 +184,7 @@ class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, Gener
             .prefetch_related(Prefetch("children", queryset=ReviewComment.objects.select_related("user")))
             .order_by("created_at")
         )
-        paginator = self.pagination_class[0]()
+        paginator = self.pagination_class()
         page = paginator.paginate_queryset(queryset, request)
         if page is not None:
             reviews_data = RootReviewSerializer(page, many=True).data
@@ -253,7 +253,7 @@ class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, Gener
 
     @action(methods=["POST"], detail=False)
     def attach_attribute(self, request):
-        attrs = json.loads(request.data.get("attributes", []))
+        attrs = request.data.get("attributes", [])
         product = self.attrs_handler(attrs, request.data.get("product_id"))
         return Response(self.serializer_class(product).data, status=status.HTTP_200_OK)
 
