@@ -12,11 +12,18 @@ class Command(BaseCommand):
     @transaction.atomic
     def handle(self, *args, **kwargs):
         superuser = User.objects.first()
-        category = ProductCategory.objects.create(name="TV")
+        categories = [ProductCategory.objects.create(name=f"{i + 1}") for i in range(10)]
+
+        for category in categories:
+            for _ in range(5):
+                ProductCategory.objects.create(
+                    name=f"подкатегория категории{category.name}{_}",
+                    parent=category,
+                )
 
         products = [
             Product.objects.create(
-                category=category,
+                category=random.choice(categories),
                 name=f"Product {i + 1}",
                 description=f"Description {i + 1}",
                 old_price=(old_price := random.randint(100, 5000)),
@@ -39,7 +46,7 @@ class Command(BaseCommand):
 
         comments = []
         for review in reviews:
-            for _ in range(20):
+            for _ in range(2):
                 comment = ReviewComment.objects.create(
                     product=review.product,
                     user=superuser,
@@ -49,7 +56,7 @@ class Command(BaseCommand):
                 comments.append(comment)
 
         for comment in comments:
-            for _ in range(20):
+            for _ in range(5):
                 ReviewComment.objects.create(
                     product=comment.product,
                     user=superuser,

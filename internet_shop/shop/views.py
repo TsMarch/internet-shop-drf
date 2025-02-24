@@ -149,9 +149,12 @@ class UserRegistrationViewSet(CreateModelMixin, GenericViewSet):
     }
 
 
-class ProductCategoryViewSet(CreateModelMixin, GenericViewSet):
+class ProductCategoryViewSet(CreateModelMixin, GenericViewSet, RetrieveModelMixin):
     queryset = ProductCategory.objects.all()
     serializer_class = CategorySerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        pass
 
 
 class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, GenericViewSet):
@@ -161,6 +164,7 @@ class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, Gener
         "list": ProductListSerializer,
         "create": ProductSerializer,
         "retrieve": ProductSerializer,
+        "filter_by_category": ProductListSerializer,
     }
     pagination_class = ReviewPagination
 
@@ -209,6 +213,19 @@ class ProductViewSet(RetrieveModelMixin, CreateModelMixin, ListModelMixin, Gener
         product = ProductAttributeService(product_id=product_id, attributes=attrs)
         product = product.attach_attribute()
         return product
+
+    @action(methods=["GET"], detail=False, url_path="category/(?P<category_id>\\d+)")
+    def filter_by_category(self, request, category_id=None):
+        root_category = ProductCategory.objects.get(id=category_id)
+        descendants = root_category.get_descendants(include_self=True)
+        products = (
+            self.get_queryset()
+            .filter(category__in=descendants)
+            .select_related("category")
+            .prefetch_related("eav_values__attribute")
+        )
+        serialized_products = self.get_serializer(products, many=True).data
+        return Response(serialized_products, status=status.HTTP_200_OK)
 
     @action(methods=["GET"], detail=True, url_path="comments/(?P<comment_id>\\d+)")
     def get_nested_comments(self, request, pk=None, comment_id=None):
