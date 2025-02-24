@@ -17,7 +17,7 @@ class ProductCategory(MPTTModel):
 
 
 class Product(models.Model):
-    category = TreeForeignKey(ProductCategory, on_delete=models.PROTECT, related_name="products")
+    category = models.ForeignKey(ProductCategory, on_delete=models.PROTECT, related_name="products")
     id = models.AutoField(primary_key=True)
     name = models.CharField("Имя", max_length=100, blank=False)
     description = models.CharField("Описание", max_length=300, blank=True)
