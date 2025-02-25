@@ -31,7 +31,6 @@ from .pagination import ReviewPagination
 from .serializers import (
     CartSerializer,
     CategorySerializer,
-    NestedReviewSerializer,
     OrderDetailSerializer,
     OrderSerializer,
     ProductListSerializer,
@@ -165,6 +164,7 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
         "create": ProductSerializer,
         "retrieve": ProductSerializer,
         "filter_by_category": ProductListSerializer,
+        "get_nested_comments": RootReviewSerializer,
     }
     pagination_class = ReviewPagination
 
@@ -231,26 +231,19 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
     def get_nested_comments(self, request, pk=None, comment_id=None):
         try:
             root_comment = ReviewComment.objects.get(id=comment_id, product_id=pk)
+            descendants = root_comment.get_descendants(include_self=True).select_related("user")
 
-            nested_comments = (
-                root_comment.get_descendants(include_self=True).select_related("user").order_by("tree_id", "lft")
-            )
+            comment_map = {comment.id: comment for comment in descendants}
 
-            comments_dict = {comment.id: comment for comment in nested_comments}
+            for comment in descendants:
+                comment.children_list = []
 
-            for comment in comments_dict.values():
-                setattr(comment, "children_list", [])
+            for comment in descendants:
+                if comment.parent_id and comment.parent_id in comment_map:
+                    comment_map[comment.parent_id].children_list.append(comment)
 
-            tree = []
-            for comment in nested_comments:
-                if comment.parent_id:
-                    comments_dict[comment.parent_id].children_list.append(comment)
-                else:
-                    tree.append(comment)
-
-            serializer = NestedReviewSerializer(tree, many=True, context={"children_attr": "children_list"})
-
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            serializer = self.get_serializer(descendants, many=True).data
+            return Response(serializer, status=status.HTTP_200_OK)
 
         except ReviewComment.DoesNotExist:
             return Response({"error": "no such comment"}, status=status.HTTP_404_NOT_FOUND)

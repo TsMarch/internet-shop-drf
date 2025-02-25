@@ -60,13 +60,6 @@ class ProductListSerializer(serializers.ModelSerializer):
 
 
 class RootReviewSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = ReviewComment
-        fields = ["id", "text", "user", "rating", "created_at", "children"]
-
-
-class NestedReviewSerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()
 
     class Meta:
@@ -74,9 +67,9 @@ class NestedReviewSerializer(serializers.ModelSerializer):
         fields = ["id", "user", "text", "created_at", "updated_at", "rating", "children"]
 
     def get_children(self, obj):
-        children_attr = self.context.get("children_attr", "children_list")
-        children = getattr(obj, children_attr, [])
-        return NestedReviewSerializer(children, many=True, context=self.context).data if children else []
+        if hasattr(obj, "children_list") and obj.children_list:
+            return RootReviewSerializer(obj.children_list, many=True).data
+        return []
 
 
 class ProductSerializer(serializers.ModelSerializer):
