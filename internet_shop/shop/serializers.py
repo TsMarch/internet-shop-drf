@@ -68,7 +68,7 @@ class RootReviewSerializer(serializers.ModelSerializer):
 
     def get_children(self, obj):
         if hasattr(obj, "children_list") and obj.children_list:
-            return RootReviewSerializer(obj.children_list, many=True).data
+            return [RootReviewSerializer(child).data for child in obj.children_list]
         return []
 
 

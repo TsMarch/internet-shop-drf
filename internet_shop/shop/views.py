@@ -65,8 +65,9 @@ def delete_attribute(request):
     return Response({"status": "successfully deleted"}, status=status.HTTP_200_OK)
 
 
-class ReviewCommentViewSet(GenericViewSet):
+class ReviewCommentViewSet(CreateModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated]
+    serializer_class = RootReviewSerializer
 
     @action(detail=False, methods=["POST"])
     def create_review(self, request):
@@ -86,10 +87,10 @@ class ReviewCommentViewSet(GenericViewSet):
     @action(detail=False, methods=["POST"])
     def create_comment(self, request):
         user = self.request.user
-        product = Product.objects.filter(id=request.data.get("product_id"))
+        product = Product.objects.get(id=request.data.get("product_id"))
         text = request.data.get("text")
         parent = request.data.get("parent")
-        ReviewComment.objects.create(user=user, product=product, text=text, parent=parent)
+        ReviewComment.objects.create(user=user, product=product, text=text, parent=ReviewComment.objects.get(id=parent))
         return Response("comment successfully create", status=status.HTTP_200_OK)
 
 
@@ -240,9 +241,11 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
 
             for comment in descendants:
                 if comment.parent_id and comment.parent_id in comment_map:
-                    comment_map[comment.parent_id].children_list.append(comment)
+                    parent_comment = comment_map[comment.parent_id]
+                    if comment not in parent_comment.children_list:
+                        parent_comment.children_list.append(comment)
 
-            serializer = self.get_serializer(descendants, many=True).data
+            serializer = RootReviewSerializer(descendants, many=True).data
             return Response(serializer, status=status.HTTP_200_OK)
 
         except ReviewComment.DoesNotExist:
