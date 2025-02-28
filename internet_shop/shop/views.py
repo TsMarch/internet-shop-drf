@@ -234,18 +234,21 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
             root_comment = ReviewComment.objects.get(id=comment_id, product_id=pk)
             descendants = root_comment.get_descendants(include_self=True).select_related("user")
 
-            comment_map = {comment.id: comment for comment in descendants}
+            comment_dict = {comment.id: comment for comment in descendants}
 
-            for comment in descendants:
+            for comment in comment_dict.values():
                 comment.children_list = []
 
-            for comment in descendants:
-                if comment.parent_id and comment.parent_id in comment_map:
-                    parent_comment = comment_map[comment.parent_id]
-                    if comment not in parent_comment.children_list:
-                        parent_comment.children_list.append(comment)
+            root_comments = []
 
-            serializer = RootReviewSerializer(descendants, many=True).data
+            for comment in comment_dict.values():
+                if comment.parent_id and comment.parent_id in comment_dict:
+                    parent_comment = comment_dict[comment.parent_id]
+                    parent_comment.children_list.append(comment)
+                else:
+                    root_comments.append(comment)
+
+            serializer = RootReviewSerializer(root_comments, many=True).data
             return Response(serializer, status=status.HTTP_200_OK)
 
         except ReviewComment.DoesNotExist:
