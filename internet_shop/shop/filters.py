@@ -1,24 +1,45 @@
 import json
 
-from django.db.models import Field, Q
-from rest_framework.filters import BaseFilterBackend
+import django_filters
+from django.db.models import Avg, Count, Q
+from django_filters.rest_framework import FilterSet
 
 from .models import Product
 
 
-class ProductFilter(BaseFilterBackend):
-    def filter_queryset(self, request, queryset, view):
-        eav_filters = request.query_params.get("filters")
+class ProductFilter(FilterSet):
+    min_comments = django_filters.NumberFilter(method="filter_by_comments", label="Минимум комментариев")
+    min_rating = django_filters.NumberFilter(method="filter_by_rating", label="Минимальный рейтинг")
+    filters = django_filters.CharFilter(method="apply_eav_filters", label="Дополнительные фильтры")
+    ordering = django_filters.OrderingFilter(
+        fields=(
+            ("popularity", "popularity"),
+            ("rating", "rating"),
+        ),
+        field_labels={
+            "popularity": "Популярность",
+            "rating": "Рейтинг",
+        },
+    )
 
-        if not eav_filters:
-            return queryset
+    class Meta:
+        model = Product
+        fields = ["min_comments", "min_rating", "filters"]
 
+    def filter_by_comments(self, queryset, name, value):
+        return queryset.annotate(comment_count=Count("reviews")).filter(comment_count__gte=value)
+
+    def filter_by_rating(self, queryset, name, value):
+        return queryset.annotate(avg_rating=Avg("reviews__rating")).filter(avg_rating__gte=value)
+
+    def apply_eav_filters(self, queryset, name, value):
         try:
-            filters = json.loads(eav_filters)
+            filters = json.loads(value)
         except ValueError:
             return queryset
-        fields = [field.name for field in Product._meta.get_fields() if isinstance(field, Field)]
+
         query = Q()
+        fields = {field.name for field in Product._meta.get_fields()}
 
         for attr_name, filter_data in filters.items():
             data_type = filter_data.get("type")
@@ -26,35 +47,27 @@ class ProductFilter(BaseFilterBackend):
 
             match data_type:
                 case "text" | "enum":
-                    if attr_name in fields:
-                        query &= Q(**{f"{attr_name}__in": value})
-                    else:
-                        query &= Q(**{f"eav__{attr_name}__in": value})
-
+                    key = attr_name if attr_name in fields else f"eav__{attr_name}"
+                    query &= Q(**{f"{key}__in": value})
                 case "number":
-
-                    gte = float(value["gte"]) if value.get("gte") is not None else None
-                    lte = float(value["lte"]) if value.get("lte") is not None else None
-                    prefix = attr_name if attr_name in fields else f"eav__{attr_name}"
-                    self._validate_gte_and_lte(gte=gte, lte=lte)
-                    filters = {}
+                    gte = value.get("gte")
+                    lte = value.get("lte")
+                    key = attr_name if attr_name in fields else f"eav__{attr_name}"
+                    self.validate_gte_and_lte(gte, lte)
+                    range_filters = {}
                     if gte is not None:
-                        filters[f"{prefix}__gte"] = gte
+                        range_filters[f"{key}__gte"] = float(gte)
                     if lte is not None:
-                        filters[f"{prefix}__lte"] = lte
-
-                    if filters:
-                        query &= Q(**filters)
-                    print(query)
+                        range_filters[f"{key}__lte"] = float(lte)
+                    if range_filters:
+                        query &= Q(**range_filters)
 
         return queryset.filter(query)
 
-    def _validate_gte_and_lte(self, **kwargs):
-        if kwargs["gte"] is not None and not isinstance(kwargs["gte"], (float, int)):
+    def validate_gte_and_lte(self, gte, lte):
+        if gte is not None and not isinstance(gte, (int, float)):
             raise ValueError("'gte' must be a number or None")
-        if kwargs["lte"] is not None and not isinstance(kwargs["lte"], (float, int)):
+        if lte is not None and not isinstance(lte, (int, float)):
             raise ValueError("'lte' must be a number or None")
-        if kwargs["gte"] is not None and kwargs["lte"] is not None and kwargs["gte"] > kwargs["lte"]:
+        if gte is not None and lte is not None and gte > lte:
             raise ValueError("Invalid range: 'gte' cannot be greater than 'lte'")
-
-        return kwargs
