@@ -3,7 +3,17 @@ import logging
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db.models import Avg, Count, Prefetch
+from django.db.models import (
+    Avg,
+    Count,
+    ExpressionWrapper,
+    F,
+    IntegerField,
+    Prefetch,
+    Q,
+    Sum,
+)
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -159,7 +169,8 @@ class ProductCategoryViewSet(CreateModelMixin, GenericViewSet, RetrieveModelMixi
 
 class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListModelMixin, GenericViewSet):
     serializer_class = ProductListSerializer
-    filter_backends = [ProductFilter, DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ProductFilter
     serializer_action_classes = {
         "list": ProductListSerializer,
         "create": ProductSerializer,
@@ -181,6 +192,21 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
         ).get(id=self.kwargs["pk"])
         return product
 
+    def get_queryset(self):
+        if self.action == "list":
+            return Product.objects.select_related("category").annotate(
+                average_rating=Avg("reviews__rating"),
+                rating_count=Count("reviews__rating"),
+                review_count=Count("reviews", filter=Q(reviews__parent=None)),
+                comment_count=Count("reviews", filter=Q(reviews__parent__isnull=False)),
+                sales_count=Coalesce(Sum("orders__items__quantity"), 0),
+                popularity=ExpressionWrapper(
+                    F("sales_count") + F("comment_count") * F("review_count"),
+                    output_field=IntegerField(),
+                ),
+            )
+        return Product.objects.all()
+
     def retrieve(self, request, *args, **kwargs):
         product = self.get_object()
         queryset = (
@@ -200,13 +226,6 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
         product_data["reviews"] = reviews_paginated
 
         return Response(product_data, status=status.HTTP_200_OK)
-
-    def get_queryset(self):
-        if self.action == "list":
-            return Product.objects.select_related("category").annotate(
-                average_rating=Avg("reviews__rating"), rating_count=Count("reviews__rating")
-            )
-        return Product.objects.all()
 
     @staticmethod
     def attrs_handler(attrs, product_id):
