@@ -9,7 +9,7 @@ from .models import Product
 
 class ProductFilter(FilterSet):
     min_comments = django_filters.NumberFilter(
-        field_name="comment_count", lookup_expr="gte", label="Минимум комментариев"
+        field_name="_comment_count", lookup_expr="gte", label="Минимум комментариев"
     )
     min_rating = django_filters.NumberFilter(
         field_name="average_rating", lookup_expr="gte", label="Минимальный рейтинг"
