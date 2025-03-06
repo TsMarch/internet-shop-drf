@@ -197,9 +197,9 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
             return Product.objects.select_related("category").annotate(
                 average_rating=Avg("reviews__rating"),
                 rating_count=Count("reviews__rating"),
-                review_count=Count("reviews", filter=Q(reviews__parent=None)),
-                comment_count=Count("reviews", filter=Q(reviews__parent__isnull=False)),
-                sales_count=Coalesce(Sum("orders__items__quantity"), 0),
+                _populatiry_review_count=Count("reviews", filter=Q(reviews__parent=None)),
+                _popularity_comment_count=Count("reviews", filter=Q(reviews__parent__isnull=False)),
+                _popularity_sales_count=Coalesce(Sum("orders__items__quantity"), 0),
                 popularity=ExpressionWrapper(
                     F("sales_count") + F("comment_count") * F("review_count"),
                     output_field=IntegerField(),
