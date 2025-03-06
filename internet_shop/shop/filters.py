@@ -1,15 +1,19 @@
 import json
 
 import django_filters
-from django.db.models import Avg, Count, Q
+from django.db.models import Q
 from django_filters.rest_framework import FilterSet
 
 from .models import Product
 
 
 class ProductFilter(FilterSet):
-    min_comments = django_filters.NumberFilter(method="filter_by_comments", label="Минимум комментариев")
-    min_rating = django_filters.NumberFilter(method="filter_by_rating", label="Минимальный рейтинг")
+    min_comments = django_filters.NumberFilter(
+        field_name="comment_count", lookup_expr="gte", label="Минимум комментариев"
+    )
+    min_rating = django_filters.NumberFilter(
+        field_name="average_rating", lookup_expr="gte", label="Минимальный рейтинг"
+    )
     filters = django_filters.CharFilter(method="apply_eav_filters", label="Дополнительные фильтры")
     ordering = django_filters.OrderingFilter(
         fields=(
@@ -25,12 +29,6 @@ class ProductFilter(FilterSet):
     class Meta:
         model = Product
         fields = ["min_comments", "min_rating", "filters"]
-
-    def filter_by_comments(self, queryset, name, value):
-        return queryset.annotate(comment_count=Count("reviews")).filter(comment_count__gte=value)
-
-    def filter_by_rating(self, queryset, name, value):
-        return queryset.annotate(avg_rating=Avg("reviews__rating")).filter(avg_rating__gte=value)
 
     def apply_eav_filters(self, queryset, name, value):
         try:
