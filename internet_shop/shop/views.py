@@ -159,7 +159,7 @@ class UserRegistrationViewSet(CreateModelMixin, GenericViewSet):
     }
 
 
-class ProductCategoryViewSet(CreateModelMixin, GenericViewSet, RetrieveModelMixin):
+class ProductCategoryViewSet(CreateModelMixin, GenericViewSet, RetrieveModelMixin, ListModelMixin):
     queryset = ProductCategory.objects.all()
     serializer_class = CategorySerializer
 
