@@ -1,6 +1,7 @@
 import json
 
 import django_filters
+from django.contrib.postgres.search import TrigramSimilarity
 from django.db.models import Q
 from django_filters.rest_framework import FilterSet
 
@@ -14,6 +15,7 @@ class ProductFilter(FilterSet):
     min_rating = django_filters.NumberFilter(
         field_name="average_rating", lookup_expr="gte", label="Минимальный рейтинг"
     )
+    name = django_filters.CharFilter(method="filter_by_trigram")
     filters = django_filters.CharFilter(method="apply_eav_filters", label="Дополнительные фильтры")
     ordering = django_filters.OrderingFilter(
         fields=(
@@ -28,7 +30,17 @@ class ProductFilter(FilterSet):
 
     class Meta:
         model = Product
-        fields = ["min_comments", "min_rating", "filters"]
+        fields = ["min_comments", "min_rating", "filters", "name"]
+
+    def filter_by_trigram(self, queryset, name, value):
+        if not value:
+            return queryset
+        queryset = (
+            queryset.annotate(similarity=TrigramSimilarity("name", value))
+            .filter(similarity__gt=0.1)
+            .order_by("-similarity")
+        )
+        return queryset
 
     def apply_eav_filters(self, queryset, name, value):
         try:
