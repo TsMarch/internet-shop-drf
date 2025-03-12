@@ -21,16 +21,17 @@ from rest_framework import status
 from rest_framework.decorators import action, api_view
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from .filters import ProductFilter
+from .filters import ProductFilter, SalesStatisticsFilter
 from .mixins import ModelViewMixin
 from .models import (
     Cart,
     CartItems,
     Order,
+    OrderItems,
     Product,
     ProductCategory,
     ReviewComment,
@@ -47,6 +48,7 @@ from .serializers import (
     ProductListSerializer,
     ProductSerializer,
     RootReviewSerializer,
+    SalesStatisticsSerializer,
     UserBalanceHistorySerializer,
     UserBalanceSerializer,
     UserRegistrationSerializer,
@@ -158,6 +160,27 @@ class UserRegistrationViewSet(CreateModelMixin, GenericViewSet):
         "list": UserRegistrationSerializer,
         "create": UserRegistrationSerializer,
     }
+
+
+class SalesStatisticsViewSet(GenericViewSet, ModelViewMixin, RetrieveModelMixin, ListModelMixin):
+    queryset = Order.objects.all()
+    serializer_class = SalesStatisticsSerializer
+    permission_classes = [IsAdminUser]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SalesStatisticsFilter
+    pagination_class = ReviewPagination
+
+    def get_queryset(self):
+        return (
+            OrderItems.objects.values("product_id")
+            .annotate(
+                total_sales=Sum(F("price") * F("quantity")),
+                total_orders=Count("order", distinct=True),
+                avg_check=Avg(F("price") * F("quantity")),
+                total_discount=Sum(F("product__discount")),
+            )
+            .order_by("-total_sales")
+        )
 
 
 class ProductCategoryViewSet(CreateModelMixin, GenericViewSet, RetrieveModelMixin, ListModelMixin):
