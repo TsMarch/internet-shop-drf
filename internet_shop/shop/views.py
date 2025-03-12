@@ -12,6 +12,7 @@ from django.db.models import (
     Prefetch,
     Q,
     Sum,
+    Window,
 )
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
@@ -20,16 +21,17 @@ from rest_framework import status
 from rest_framework.decorators import action, api_view
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from .filters import ProductFilter
+from .filters import ProductFilter, SalesStatisticsFilter
 from .mixins import ModelViewMixin
 from .models import (
     Cart,
     CartItems,
     Order,
+    OrderItems,
     Product,
     ProductCategory,
     ReviewComment,
@@ -46,6 +48,7 @@ from .serializers import (
     ProductListSerializer,
     ProductSerializer,
     RootReviewSerializer,
+    SalesStatisticsSerializer,
     UserBalanceHistorySerializer,
     UserBalanceSerializer,
     UserRegistrationSerializer,
@@ -159,6 +162,27 @@ class UserRegistrationViewSet(CreateModelMixin, GenericViewSet):
     }
 
 
+class SalesStatisticsViewSet(GenericViewSet, ModelViewMixin, RetrieveModelMixin, ListModelMixin):
+    queryset = Order.objects.all()
+    serializer_class = SalesStatisticsSerializer
+    permission_classes = [IsAdminUser]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SalesStatisticsFilter
+    pagination_class = ReviewPagination
+
+    def get_queryset(self):
+        return (
+            OrderItems.objects.values("product_id")
+            .annotate(
+                total_sales=Sum(F("price") * F("quantity")),
+                total_orders=Count("order", distinct=True),
+                avg_check=Avg(F("price") * F("quantity")),
+                total_discount=Sum(F("product__discount")),
+            )
+            .order_by("-total_sales")
+        )
+
+
 class ProductCategoryViewSet(CreateModelMixin, GenericViewSet, RetrieveModelMixin, ListModelMixin):
     queryset = ProductCategory.objects.all()
     serializer_class = CategorySerializer
@@ -171,6 +195,7 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
     serializer_class = ProductListSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = ProductFilter
+    queryset = Product.objects.all()
     serializer_action_classes = {
         "list": ProductListSerializer,
         "create": ProductSerializer,
@@ -193,19 +218,27 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
         return product
 
     def get_queryset(self):
-        if self.action == "list":
-            return Product.objects.select_related("category").annotate(
-                average_rating=Avg("reviews__rating"),
-                rating_count=Count("reviews__rating"),
-                _popularity_review_count=Count("reviews", filter=Q(reviews__parent=None)),
-                _comment_count=Count("reviews", filter=Q(reviews__parent__isnull=False)),
-                _popularity_sales_count=Coalesce(Sum("orders__items__quantity"), 0),
-                popularity=ExpressionWrapper(
-                    F("_popularity_sales_count") + F("_comment_count") * F("_popularity_review_count"),
-                    output_field=IntegerField(),
-                ),
-            )
-        return Product.objects.all()
+        queryset = self.queryset
+
+        match self.action:
+            case "list":
+                queryset = Product.objects.select_related("category").annotate(
+                    average_rating=Avg("reviews__rating"),
+                    rating_count=Count("reviews__rating"),
+                    _popularity_review_count=Count("reviews", filter=Q(reviews__parent=None)),
+                    _comment_count=Count("reviews", filter=Q(reviews__parent__isnull=False)),
+                    _popularity_sales_count=Coalesce(Sum("orders__items__quantity"), 0),
+                    popularity=ExpressionWrapper(
+                        F("_popularity_sales_count") + F("_comment_count") * F("_popularity_review_count"),
+                        output_field=IntegerField(),
+                    ),
+                )
+            case "filter_by_average_price":
+                queryset = Product.objects.annotate(
+                    avg_price=Window(expression=Avg("price"), partition_by=F("category_id"))
+                ).filter(price__gt=F("avg_price"))
+
+        return queryset
 
     def retrieve(self, request, *args, **kwargs):
         product = self.get_object()
@@ -233,6 +266,12 @@ class ProductViewSet(ModelViewMixin, RetrieveModelMixin, CreateModelMixin, ListM
         product = ProductAttributeService(product_id=product_id, attributes=attrs)
         product = product.attach_attribute()
         return product
+
+    @action(methods=["GET"], detail=False)
+    def filter_by_average_price(self, request):
+        products = self.get_queryset()
+        self.pagination_class = None
+        return Response(self.get_serializer(products, many=True).data, status=status.HTTP_200_OK)
 
     @action(methods=["GET"], detail=False, url_path="category/(?P<category_id>\\d+)")
     def filter_by_category(self, request, category_id=None):

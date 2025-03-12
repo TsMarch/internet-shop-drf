@@ -5,7 +5,22 @@ from django.contrib.postgres.search import TrigramSimilarity
 from django.db.models import Q
 from django_filters.rest_framework import FilterSet
 
-from .models import Product
+from .models import OrderItems, Product
+
+
+class SalesStatisticsFilter(FilterSet):
+    start_date = django_filters.DateFilter(field_name="created_at", lookup_expr="gte")
+    end_date = django_filters.DateFilter(field_name="created_at", lookup_expr="lte")  # До
+    category = django_filters.CharFilter(field_name="products__category", lookup_expr="exact")
+    manufacturer = django_filters.CharFilter(field_name="products__manufacturer", lookup_expr="exact")
+    min_price = django_filters.NumberFilter(field_name="total_sum", lookup_expr="gte")
+    max_price = django_filters.NumberFilter(field_name="total_sum", lookup_expr="lte")
+    total_sales = django_filters.NumberFilter(field_name="")
+    user = django_filters.NumberFilter(field_name="user_id", lookup_expr="exact")
+
+    class Meta:
+        model = OrderItems
+        fields = ["start_date", "end_date", "category", "manufacturer", "min_price", "max_price", "user"]
 
 
 class ProductFilter(FilterSet):
