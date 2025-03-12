@@ -151,7 +151,7 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 EAV2_PRIMARY_KEY_FIELD = "django.db.models.UUIDField"
 
-SHOW_QUERIES = os.getenv("SHOW_QUERIES") == "True"
+SHOW_QUERIES = os.getenv("SHOW_QUERIES") == "TRUE"
 if SHOW_QUERIES:
     LOGGING = {
         "version": 1,
