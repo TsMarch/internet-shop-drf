@@ -10,7 +10,7 @@ from .models import OrderItems, Product
 
 class SalesStatisticsFilter(FilterSet):
     start_date = django_filters.DateFilter(field_name="created_at", lookup_expr="gte")
-    end_date = django_filters.DateFilter(field_name="created_at", lookup_expr="lte")  # До
+    end_date = django_filters.DateFilter(field_name="created_at", lookup_expr="lte")
     category = django_filters.CharFilter(field_name="products__category", lookup_expr="exact")
     manufacturer = django_filters.CharFilter(field_name="products__manufacturer", lookup_expr="exact")
     min_price = django_filters.NumberFilter(field_name="total_sum", lookup_expr="gte")

@@ -50,11 +50,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 
 class SalesStatisticsSerializer(serializers.Serializer):
-    product_id = serializers.IntegerField()
     total_sales = serializers.DecimalField(max_digits=15, decimal_places=2)
     total_orders = serializers.IntegerField()
     avg_check = serializers.DecimalField(max_digits=15, decimal_places=2)
-    total_discount = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    discount = serializers.DecimalField(max_digits=15, decimal_places=2)
 
 
 class ProductListSerializer(serializers.ModelSerializer):
