@@ -176,7 +176,8 @@ class SalesStatisticsViewSet(ListAPIView):
                 total_sales=Sum(F("price") * F("quantity")),
                 total_orders=Count("order", distinct=True),
                 avg_check=Avg(F("price") * F("quantity")),
-                product_discount=F("product__discount"),
+                discount=F("product__discount"),
+                date=F("order__created_at"),
             )
             .order_by("-total_sales")
         )

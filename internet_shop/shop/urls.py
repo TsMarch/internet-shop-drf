@@ -30,8 +30,7 @@ external_order_router = routers.DefaultRouter()
 external_order_router.register(r"", ExternalOrderViewSet, basename="external-orders")
 review_comment_router = routers.DefaultRouter()
 review_comment_router.register(r"", ReviewCommentViewSet, basename="reviews-comments")
-sales_statistics_router = routers.DefaultRouter()
-sales_statistics_router.register(r"", SalesStatisticsViewSet, basename="statistics")
+
 
 urlpatterns = [
     path("product/", include(shop_router.urls)),
@@ -48,5 +47,5 @@ urlpatterns = [
     path("external/", include(external_order_router.urls)),
     path("delete_attribute/", delete_attribute),
     path("review-comment/", include(review_comment_router.urls)),
-    path("sales/statistics/", include(sales_statistics_router.urls)),
+    path("sales/statistics/", SalesStatisticsViewSet.as_view(), name="sales-statistics"),
 ]

@@ -9,18 +9,16 @@ from .models import OrderItems, Product
 
 
 class SalesStatisticsFilter(FilterSet):
-    start_date = django_filters.DateFilter(field_name="created_at", lookup_expr="gte")
-    end_date = django_filters.DateFilter(field_name="created_at", lookup_expr="lte")
+    date_range = django_filters.DateFromToRangeFilter(field_name="order__created_at")
     category = django_filters.CharFilter(field_name="products__category", lookup_expr="exact")
     manufacturer = django_filters.CharFilter(field_name="products__manufacturer", lookup_expr="exact")
-    min_price = django_filters.NumberFilter(field_name="total_sum", lookup_expr="gte")
-    max_price = django_filters.NumberFilter(field_name="total_sum", lookup_expr="lte")
+    price_range = django_filters.RangeFilter(field_name="total_sum")
     total_sales = django_filters.NumberFilter(field_name="")
     user = django_filters.NumberFilter(field_name="user_id", lookup_expr="exact")
 
     class Meta:
         model = OrderItems
-        fields = ["start_date", "end_date", "category", "manufacturer", "min_price", "max_price", "user"]
+        fields = ["date_range", "category", "manufacturer", "price_range", "user"]
 
 
 class ProductFilter(FilterSet):

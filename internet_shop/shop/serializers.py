@@ -54,6 +54,7 @@ class SalesStatisticsSerializer(serializers.Serializer):
     total_orders = serializers.IntegerField()
     avg_check = serializers.DecimalField(max_digits=15, decimal_places=2)
     discount = serializers.DecimalField(max_digits=15, decimal_places=2)
+    date = serializers.DateTimeField()
 
 
 class ProductListSerializer(serializers.ModelSerializer):
