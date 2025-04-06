@@ -2,23 +2,89 @@ import json
 
 import django_filters
 from django.contrib.postgres.search import TrigramSimilarity
-from django.db.models import Q
+from django.db.models import Avg, Count, F, OuterRef, Q, Subquery, Sum, Window
 from django_filters.rest_framework import FilterSet
 
-from .models import OrderItems, Product
+from .models import OrderItems, Product, ReviewComment
 
 
 class SalesStatisticsFilter(FilterSet):
+    product_id = django_filters.NumberFilter(field_name="product_id", lookup_expr="exact")
     date_range = django_filters.DateFromToRangeFilter(field_name="order__created_at")
-    category = django_filters.CharFilter(field_name="products__category", lookup_expr="exact")
-    manufacturer = django_filters.CharFilter(field_name="products__manufacturer", lookup_expr="exact")
-    price_range = django_filters.RangeFilter(field_name="total_sum")
-    total_sales = django_filters.NumberFilter(field_name="")
+    category = django_filters.NumberFilter(field_name="product__category", lookup_expr="exact")
+    manufacturer = django_filters.CharFilter(field_name="product_manufacturer", lookup_expr="exact")
+    price_range = django_filters.RangeFilter(field_name="price")
+    rating_min = django_filters.NumberFilter(field_name="rating", lookup_expr="gte", required=False)
+    total_orders_min = django_filters.NumberFilter(field_name="total_orders", lookup_expr="gte")
     user = django_filters.NumberFilter(field_name="user_id", lookup_expr="exact")
 
     class Meta:
         model = OrderItems
-        fields = ["date_range", "category", "manufacturer", "price_range", "user"]
+        fields = ["date_range", "category", "manufacturer", "price_range", "user", "rating_min"]
+
+
+class SalesStatisticsQueryBuilder:
+    def __init__(self, params):
+        self.params = params
+        self.group_by_fields = []
+        self.queryset = OrderItems.objects.annotate()
+
+    def _add_group_by_fields(self):
+        if "category" in self.params:
+            self.group_by_fields.append("product__category")
+        if "manufacturer" in self.params:
+            self.group_by_fields.append("product__manufacturer")
+        if "date_range_after" in self.params or "date_range_before" in self.params:
+            self.group_by_fields.append("order__created_at")
+        if "product_id" in self.params:
+            self.group_by_fields.append("product_id")
+        if "discount" in self.params:
+            self.group_by_fields.append("product__discount")
+        if "rating" in self.params:
+            self.group_by_fields.append("rating")
+
+        self.group_by_fields.append("order__created_at")
+
+    def _add_rating_subquery(self):
+        rating_subquery = (
+            ReviewComment.objects.filter(product_id=OuterRef("product_id"), rating__isnull=False)
+            .annotate(avg_rating=Window(expression=Avg("rating"), partition_by=[F("product_id")]))
+            .values("avg_rating")[:1]
+        )
+        self.queryset = self.queryset.annotate(rating=Subquery(rating_subquery))
+
+    def _apply_filters(self):
+        rating_min = self.params.get("rating_min")
+        total_sales_min = self.params.get("total_sales_min")
+
+        if rating_min:
+            self.queryset = self.queryset.filter(rating__gte=rating_min)
+
+        if total_sales_min:
+            self.queryset = self.queryset.filter(total_orders__gte=total_sales_min)
+
+        if "discount" in self.params:
+            self.queryset = self.queryset.annotate(discount=F("product__discount"))
+
+    def _apply_discount(self):
+        if "discount" in self.params:
+            self.queryset = self.queryset.annotate(discount=F("product__discount"))
+
+    def _add_aggregations(self):
+        self.queryset = self.queryset.values(*self.group_by_fields).annotate(
+            total_sales=Sum(F("price") * F("quantity")),
+            total_orders=Count("order", distinct=True),
+            avg_check=Avg(F("price") * F("quantity")),
+            date=F("order__created_at"),
+        )
+
+    def get_queryset(self):
+        self._add_group_by_fields()
+        self._add_rating_subquery()
+        self._add_aggregations()
+        self._apply_filters()
+
+        return self.queryset.order_by("date")
 
 
 class ProductFilter(FilterSet):

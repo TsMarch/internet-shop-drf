@@ -26,13 +26,12 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from .filters import ProductFilter, SalesStatisticsFilter
+from .filters import ProductFilter, SalesStatisticsFilter, SalesStatisticsQueryBuilder
 from .mixins import ModelViewMixin
 from .models import (
     Cart,
     CartItems,
     Order,
-    OrderItems,
     Product,
     ProductCategory,
     ReviewComment,
@@ -170,17 +169,9 @@ class SalesStatisticsViewSet(ListAPIView):
     filterset_class = SalesStatisticsFilter
 
     def get_queryset(self):
-        return (
-            OrderItems.objects.values("product_id")
-            .annotate(
-                total_sales=Sum(F("price") * F("quantity")),
-                total_orders=Count("order", distinct=True),
-                avg_check=Avg(F("price") * F("quantity")),
-                discount=F("product__discount"),
-                date=F("order__created_at"),
-            )
-            .order_by("-total_sales")
-        )
+        params = self.request.query_params
+        query_builder = SalesStatisticsQueryBuilder(params)
+        return query_builder.get_queryset()
 
 
 class ProductCategoryViewSet(CreateModelMixin, GenericViewSet, RetrieveModelMixin, ListModelMixin):
