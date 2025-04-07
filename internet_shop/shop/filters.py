@@ -31,7 +31,7 @@ class SalesStatisticsQueryBuilder:
 
     def get_queryset(self):
         self._add_group_by_fields()
-        self._add_rating_subquery()
+        self._add_rating()
         self._add_aggregations()
 
         return self.queryset.order_by("date")
@@ -68,18 +68,8 @@ class SalesStatisticsQueryBuilder:
         if not self.group_by_fields:
             self.group_by_fields = ["order__created_at"]
 
-    def _add_rating_subquery(self):
+    def _add_rating(self):
         self.queryset = self.queryset.annotate(rating=Avg("product__reviews__rating"))
-
-    def _apply_filters(self):
-        rating_min = self.params.get("rating_min")
-        total_sales_min = self.params.get("total_sales_min")
-
-        if rating_min:
-            self.queryset = self.queryset.filter(rating__gte=rating_min)
-
-        if total_sales_min:
-            self.queryset = self.queryset.filter(total_orders__gte=total_sales_min)
 
     def _add_aggregations(self):
         self.queryset = self.queryset.annotate(**self.additional_annotations)
