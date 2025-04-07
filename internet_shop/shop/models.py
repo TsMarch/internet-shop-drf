@@ -107,7 +107,7 @@ class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     active_flag = models.BooleanField(blank=True, default=True)
     delivery_flag = models.BooleanField(blank=True, default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateField()
     total_sum = models.DecimalField("Сумма заказа", decimal_places=6, max_digits=20, null=True)
     products = models.ManyToManyField(Product, through="OrderItems", related_name="orders")
 

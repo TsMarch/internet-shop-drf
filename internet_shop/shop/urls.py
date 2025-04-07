@@ -8,6 +8,7 @@ from .views import (
     ProductCategoryViewSet,
     ProductViewSet,
     ReviewCommentViewSet,
+    SalesStatisticsViewSet,
     UserBalanceViewSet,
     UserRegistrationViewSet,
     delete_attribute,
@@ -30,6 +31,7 @@ external_order_router.register(r"", ExternalOrderViewSet, basename="external-ord
 review_comment_router = routers.DefaultRouter()
 review_comment_router.register(r"", ReviewCommentViewSet, basename="reviews-comments")
 
+
 urlpatterns = [
     path("product/", include(shop_router.urls)),
     path(
@@ -45,4 +47,5 @@ urlpatterns = [
     path("external/", include(external_order_router.urls)),
     path("delete_attribute/", delete_attribute),
     path("review-comment/", include(review_comment_router.urls)),
+    path("sales/statistics/", SalesStatisticsViewSet.as_view(), name="sales-statistics"),
 ]
