@@ -51,12 +51,22 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 class SalesStatisticsSerializer(serializers.Serializer):
     product_id = serializers.IntegerField(required=False)
+    product_name = serializers.CharField(required=False)
+    product_quantity = serializers.IntegerField(required=False)
+
+    category_name = serializers.CharField(required=False)
+    category_id = serializers.IntegerField(source="product__category", required=False)
+
     total_sales = serializers.DecimalField(max_digits=15, decimal_places=2)
     total_orders = serializers.IntegerField()
     avg_check = serializers.DecimalField(max_digits=15, decimal_places=2)
-    discount = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+    total_discount = serializers.DecimalField(max_digits=15, decimal_places=2, required=False)
+
     date = serializers.DateField()
     rating = serializers.FloatField(required=False)
+
+    user_id = serializers.IntegerField(required=False)
+    user_email = serializers.EmailField(required=False)
 
 
 class ProductListSerializer(serializers.ModelSerializer):

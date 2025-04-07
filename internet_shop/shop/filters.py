@@ -2,10 +2,10 @@ import json
 
 import django_filters
 from django.contrib.postgres.search import TrigramSimilarity
-from django.db.models import Avg, Count, F, OuterRef, Q, Subquery, Sum, Window
+from django.db.models import Avg, Count, F, Q, Sum
 from django_filters.rest_framework import FilterSet
 
-from .models import OrderItems, Product, ReviewComment
+from .models import OrderItems, Product
 
 
 class SalesStatisticsFilter(FilterSet):
@@ -29,29 +29,47 @@ class SalesStatisticsQueryBuilder:
         self.group_by_fields = []
         self.queryset = OrderItems.objects.annotate()
 
-    def _add_group_by_fields(self):
-        if "category" in self.params:
-            self.group_by_fields.append("product__category")
-        if "manufacturer" in self.params:
-            self.group_by_fields.append("product__manufacturer")
-        if "date_range_after" in self.params or "date_range_before" in self.params:
-            self.group_by_fields.append("order__created_at")
-        if "product_id" in self.params:
-            self.group_by_fields.append("product_id")
-        if "discount" in self.params:
-            self.group_by_fields.append("product__discount")
-        if "rating" in self.params:
-            self.group_by_fields.append("rating")
+    def get_queryset(self):
+        self._add_group_by_fields()
+        self._add_rating_subquery()
+        self._add_aggregations()
 
-        self.group_by_fields.append("order__created_at")
+        return self.queryset.order_by("date")
+
+    def _add_group_by_fields(self):
+
+        group_by_mapping = {
+            "category": {"field": "product__category", "annotations": {"category_name": F("product__category__name")}},
+            "manufacturer": {"field": "product__manufacturer", "annotations": {}},
+            "date": {"field": "order__created_at", "annotations": {}},
+            "product": {
+                "field": "product_id",
+                "annotations": {"product_name": F("product__name"), "product_quantity": F("quantity")},
+            },
+            "discount": {"field": "product__discount", "annotations": {}},
+            "user": {
+                "field": "order__user_id",
+                "annotations": {"user_email": F("order__user__email"), "user_id": F("order__user_id")},
+            },
+        }
+
+        group_by_param = self.params.get("group_by", "")
+        fields = group_by_param.split(",") if group_by_param else []
+
+        self.group_by_fields = []
+        self.additional_annotations = {}
+
+        for field in fields:
+            if field in group_by_mapping:
+                mapping = group_by_mapping[field]
+                self.group_by_fields.append(mapping["field"])
+                self.additional_annotations.update(mapping.get("annotations", {}))
+
+        if not self.group_by_fields:
+            self.group_by_fields = ["order__created_at"]
 
     def _add_rating_subquery(self):
-        rating_subquery = (
-            ReviewComment.objects.filter(product_id=OuterRef("product_id"), rating__isnull=False)
-            .annotate(avg_rating=Window(expression=Avg("rating"), partition_by=[F("product_id")]))
-            .values("avg_rating")[:1]
-        )
-        self.queryset = self.queryset.annotate(rating=Subquery(rating_subquery))
+        self.queryset = self.queryset.annotate(rating=Avg("product__reviews__rating"))
 
     def _apply_filters(self):
         rating_min = self.params.get("rating_min")
@@ -63,28 +81,18 @@ class SalesStatisticsQueryBuilder:
         if total_sales_min:
             self.queryset = self.queryset.filter(total_orders__gte=total_sales_min)
 
-        if "discount" in self.params:
-            self.queryset = self.queryset.annotate(discount=F("product__discount"))
-
-    def _apply_discount(self):
-        if "discount" in self.params:
-            self.queryset = self.queryset.annotate(discount=F("product__discount"))
-
     def _add_aggregations(self):
-        self.queryset = self.queryset.values(*self.group_by_fields).annotate(
+        self.queryset = self.queryset.annotate(**self.additional_annotations)
+
+        self.queryset = self.queryset.values(
+            *self.group_by_fields, *self.additional_annotations.keys(), "rating"
+        ).annotate(
             total_sales=Sum(F("price") * F("quantity")),
             total_orders=Count("order", distinct=True),
+            total_discount=Sum((F("product__old_price") - F("price")) * F("quantity")),
             avg_check=Avg(F("price") * F("quantity")),
             date=F("order__created_at"),
         )
-
-    def get_queryset(self):
-        self._add_group_by_fields()
-        self._add_rating_subquery()
-        self._add_aggregations()
-        self._apply_filters()
-
-        return self.queryset.order_by("date")
 
 
 class ProductFilter(FilterSet):
