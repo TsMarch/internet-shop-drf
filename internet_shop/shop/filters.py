@@ -92,7 +92,7 @@ class ProductFilter(FilterSet):
     min_rating = django_filters.NumberFilter(
         field_name="average_rating", lookup_expr="gte", label="Минимальный рейтинг"
     )
-    name = django_filters.CharFilter(method="search_with_trigram")
+    search = django_filters.CharFilter(method="search_with_trigram")
     filters = django_filters.CharFilter(method="apply_eav_filters", label="Дополнительные фильтры")
     ordering = django_filters.OrderingFilter(
         fields=(
@@ -107,20 +107,41 @@ class ProductFilter(FilterSet):
 
     class Meta:
         model = Product
-        fields = ["min_comments", "min_rating", "filters", "name"]
+        fields = ["min_comments", "min_rating", "filters", "search"]
 
     def search_with_trigram(self, queryset, name, value):
         if not value:
             return queryset
 
-        direct_queryset = queryset.filter(name__icontains=value)
+        direct_queryset = queryset.filter(
+            Q(name__icontains=value)
+            | Q(description__icontains=value)
+            | Q(category__name__icontains=value)
+            | Q(category__parent__name__icontains=value)
+        )
         if direct_queryset.exists():
             return direct_queryset
 
-        queryset = (
-            queryset.annotate(similarity=TrigramWordSimilarity(value, "name"))
-            .filter(Q(name__icontains=value) | Q(similarity__gt=0.4))
-            .order_by("-similarity")
+        similarity_fields = {
+            "similarity_name": "name",
+            "similarity_description": "description",
+            "similarity_category": "category__name",
+            "similarity_category_parent": "category__parent__name",
+        }
+
+        for alias, field in similarity_fields.items():
+            queryset = queryset.annotate(**{alias: TrigramWordSimilarity(value, field)})
+
+        trigram_filters = Q()
+
+        for alias in similarity_fields:
+            trigram_filters |= Q(**{f"{alias}__gt": 0.4})
+
+        queryset = queryset.filter(trigram_filters).order_by(
+            "-similarity_name",
+            "-similarity_description",
+            "-similarity_category",
+            "-similarity_category_parent",
         )
 
         return queryset
