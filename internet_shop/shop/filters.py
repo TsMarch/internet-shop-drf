@@ -1,7 +1,12 @@
 import json
 
 import django_filters
-from django.contrib.postgres.search import TrigramWordSimilarity
+from django.contrib.postgres.search import (
+    SearchQuery,
+    SearchRank,
+    SearchVector,
+    TrigramWordSimilarity,
+)
 from django.db.models import Avg, Count, F, Q, Sum
 from django_filters.rest_framework import FilterSet
 
@@ -93,6 +98,7 @@ class ProductFilter(FilterSet):
         field_name="average_rating", lookup_expr="gte", label="Минимальный рейтинг"
     )
     search = django_filters.CharFilter(method="search_with_trigram")
+    search_vector = django_filters.CharFilter(method="search_with_vector")
     filters = django_filters.CharFilter(method="apply_eav_filters", label="Дополнительные фильтры")
     ordering = django_filters.OrderingFilter(
         fields=(
@@ -137,14 +143,30 @@ class ProductFilter(FilterSet):
         for alias in similarity_fields:
             trigram_filters |= Q(**{f"{alias}__gt": 0.4})
 
-        queryset = queryset.filter(trigram_filters).order_by(
+        return queryset.filter(trigram_filters).order_by(
             "-similarity_name",
             "-similarity_description",
             "-similarity_category",
             "-similarity_category_parent",
         )
 
-        return queryset
+    def search_with_vector(self, queryset, name, value):
+        if not value:
+            return queryset
+
+        return (
+            queryset.annotate(
+                search=SearchVector(
+                    "name",
+                    "description",
+                    "category__name",
+                    "category__parent__name",
+                ),
+                rank=SearchRank(F("search"), SearchQuery(value)),
+            )
+            .filter(search=SearchQuery(value))
+            .order_by("-rank")
+        )
 
     def apply_eav_filters(self, queryset, name, value):
         try:
