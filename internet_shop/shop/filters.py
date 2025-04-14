@@ -1,11 +1,16 @@
 import json
 
 import django_filters
-from django.contrib.postgres.search import TrigramWordSimilarity
+from django.contrib.postgres.search import (
+    SearchQuery,
+    SearchRank,
+    SearchVector,
+    TrigramWordSimilarity,
+)
 from django.db.models import Avg, Count, F, Q, Sum
 from django_filters.rest_framework import FilterSet
 
-from .models import OrderItems, Product
+from .models import OrderItems, Product, ProductCategory
 
 
 class SalesStatisticsFilter(FilterSet):
@@ -92,7 +97,8 @@ class ProductFilter(FilterSet):
     min_rating = django_filters.NumberFilter(
         field_name="average_rating", lookup_expr="gte", label="Минимальный рейтинг"
     )
-    name = django_filters.CharFilter(method="search_with_trigram")
+    search = django_filters.CharFilter(method="search_with_trigram")
+    search_vector = django_filters.CharFilter(method="search_with_vector")
     filters = django_filters.CharFilter(method="apply_eav_filters", label="Дополнительные фильтры")
     ordering = django_filters.OrderingFilter(
         fields=(
@@ -107,22 +113,67 @@ class ProductFilter(FilterSet):
 
     class Meta:
         model = Product
-        fields = ["min_comments", "min_rating", "filters", "name"]
+        fields = ["min_comments", "min_rating", "filters", "search"]
 
     def search_with_trigram(self, queryset, name, value):
         if not value:
             return queryset
 
-        direct_queryset = queryset.filter(name__icontains=value)
-        if direct_queryset.exists():
-            return direct_queryset
+        similarity_fields = {
+            "similarity_name": "name",
+            "similarity_description": "description",
+        }
 
-        queryset = (
-            queryset.annotate(similarity=TrigramWordSimilarity(value, "name"))
-            .filter(Q(name__icontains=value) | Q(similarity__gt=0.4))
-            .order_by("-similarity")
+        similar_categories = ProductCategory.objects.annotate(similarity=TrigramWordSimilarity(value, "name")).filter(
+            name__trigram_word_similar=value
+        )
+        categories_list = []
+
+        if similar_categories.exists():
+            for category in similar_categories:
+                descendant = category.get_descendants(include_self=True)
+                if descendant:
+                    categories_list.append(descendant)
+
+        categories_list = set([category.id for category_object in categories_list for category in category_object])
+
+        for alias, field in similarity_fields.items():
+            queryset = queryset.annotate(**{alias: TrigramWordSimilarity(value, field)})
+
+        trigram_filters = Q()
+
+        for alias in similarity_fields:
+            trigram_filters |= Q(**{f"{alias}__gt": 0.4})
+
+        queryset = queryset.filter(
+            Q(name__trigram_word_similar=value)
+            | Q(description__trigram_word_similar=value)
+            | Q(category__in=categories_list)
+        ).order_by(
+            "-similarity_name",
+            "-similarity_description",
         )
 
+        return queryset
+
+    def search_with_vector(self, queryset, name, value):
+        if not value:
+            return queryset
+
+        queryset = (
+            queryset.annotate(
+                search=SearchVector(
+                    "name",
+                    "description",
+                    "category__name",
+                    "category__parent__name",
+                ),
+                rank=SearchRank(F("search"), SearchQuery(value)),
+            )
+            .filter(search=SearchQuery(value))
+            .order_by("-rank")
+        )
+        print(queryset.explain(analyze=True))
         return queryset
 
     def apply_eav_filters(self, queryset, name, value):
