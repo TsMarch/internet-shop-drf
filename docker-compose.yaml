@@ -22,14 +22,13 @@ services:
   celery:
     build: .
     container_name: celery
-    command: celery -A internet_shop worker -l info
+    command: celery -A internet_shop.config worker -l info
     volumes:
       - .:/app
     depends_on:
       - redis
       - postgres
     environment:
-      - DJANGO_SETTINGS_MODULE=config.settings
       - CELERY_BROKER_URL=redis://localhost:6379
     network_mode: "host"
 
