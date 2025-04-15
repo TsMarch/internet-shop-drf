@@ -22,7 +22,7 @@ services:
   celery:
     build: .
     container_name: celery
-    command: celery -A celery worker -l info
+    command: celery -A internet_shop worker -l info
     volumes:
       - .:/app
     depends_on:
