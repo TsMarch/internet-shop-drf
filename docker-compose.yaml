@@ -22,7 +22,8 @@ services:
   celery:
     build: .
     container_name: celery
-    command: celery -A internet_shop.config worker -l info
+    working_dir: /app/internet_shop
+    command: celery -A config worker -l info
     volumes:
       - .:/app
     depends_on:
