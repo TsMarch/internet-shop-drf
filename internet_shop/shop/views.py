@@ -127,7 +127,7 @@ class UserBalanceViewSet(RetrieveModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        user_balance, _ = UserBalance.objects.get_or_create(user=self.request.user)
+        user_balance = UserBalance.objects.filter(user=self.request.user)
         return user_balance
 
     def get_serializer_class(self):
