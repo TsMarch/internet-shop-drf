@@ -1,8 +1,7 @@
 from celery import shared_task
-from django.core.mail import EmailMessage
+from django.core.mail import send_mail
 
 
 @shared_task
-def send_email(to_email, subject, message):
-    email = EmailMessage(subject, message, "pass", [to_email])
-    email.send(fail_silently=False)
+def send_email(subject, message, recipient):
+    send_mail(subject=subject, message=message, from_email=None, recipient_list=recipient, fail_silently=False)

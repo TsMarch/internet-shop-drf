@@ -30,6 +30,7 @@ services:
       - redis
       - postgres
     environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
       - CELERY_BROKER_URL=redis://localhost:6379
     network_mode: "host"
 
