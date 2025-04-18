@@ -2,4 +2,5 @@
 max-line-length = 120
 exclude =
     internet_shop\config\urls.py,
-    internet_shop\shop\management\commands\generate_comments.py
+    internet_shop\shop\management\commands\generate_comments.py,
+    internet_shop\config\apps.py

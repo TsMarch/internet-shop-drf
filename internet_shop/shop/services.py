@@ -20,6 +20,7 @@ from .models import (
     UserBalance,
     UserBalanceHistory,
 )
+from .signals import order_fully_created
 
 DATATYPE_MAP = {
     "int": Attribute.TYPE_INT,
@@ -303,6 +304,7 @@ class OrderService:
             self.order.total_sum = Decimal(order_sum)
             self.order.save()
             self.payment_processor.create_balance_history(self.user, order_sum)
+            order_fully_created.send(sender=None, user=self.user, order_items=order_items, total_sum=order_sum)
             return self.order
 
         raise ValidationError("not enough money")
