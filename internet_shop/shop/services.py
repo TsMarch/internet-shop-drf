@@ -1,4 +1,3 @@
-import datetime
 from abc import ABC, abstractmethod
 from decimal import Decimal
 from pathlib import Path
@@ -282,7 +281,7 @@ class OrderService:
     def __init__(self, user, payment_processor: BalanceProcessor):
         self.user = user
         self.payment_processor = payment_processor
-        self.order = Order.objects.create(user=self.user, created_at=datetime.date.today())
+        self.order = Order.objects.create(user=self.user)
 
     @transaction.atomic
     def create_order(self) -> Order | ValidationError:
@@ -301,7 +300,7 @@ class OrderService:
             Product.objects.bulk_update(updated_products, ["available_quantity"])
             user_balance.save()
             OrderItems.objects.bulk_create(order_items)
-            # cart_items.delete()
+            cart_items.delete()
             self.order.total_sum = Decimal(order_sum)
             self.order.save()
             self.payment_processor.create_balance_history(self.user, order_sum)
