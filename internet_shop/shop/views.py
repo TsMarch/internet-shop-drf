@@ -127,8 +127,7 @@ class UserBalanceViewSet(RetrieveModelMixin, GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        user_balance = UserBalance.objects.filter(user=self.request.user)
-        return user_balance
+        return get_object_or_404(UserBalance, user=self.request.user)
 
     def get_serializer_class(self):
         if self.action == "check_balance_history":
@@ -149,6 +148,12 @@ class UserBalanceViewSet(RetrieveModelMixin, GenericViewSet):
         user_balance.save()
         deposit_processor = DepositProcessor()
         deposit_processor.create_balance_history(self.request.user, amount)
+        serializer = self.get_serializer(user_balance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["GET"])
+    def me(self, request, *args, **kwargs):
+        user_balance = self.get_queryset()
         serializer = self.get_serializer(user_balance)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
